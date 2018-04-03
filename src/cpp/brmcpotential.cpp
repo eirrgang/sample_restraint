@@ -3,7 +3,7 @@
 //
 
 #include "brmcpotential.h"
-#include <cmath>
+//#include <cmath>
 
 #include <array>
 
@@ -16,7 +16,8 @@ gmx::PotentialPointData BRMC::calculate(gmx::Vector v,
 {
     // Our convention is to calculate the force that will be applied to v.
     // An equal and opposite force is applied to v0.
-    auto rdiff = v - v0;
+    //auto rdiff = v - v0;
+    auto rdiff = v0 - v; // Taking v0-v just let's me not apply a negative sign for output.force.
     const auto Rsquared = dot(rdiff, rdiff);
     const auto R = sqrt(Rsquared);
     // TODO: find appropriate math header and namespace
@@ -29,8 +30,9 @@ gmx::PotentialPointData BRMC::calculate(gmx::Vector v,
     // Direction of force is ill-defined when v == v0
     if (R != 0)
     {
-        // output.force = k * (double(R0)/R - 1.0)*rdiff;
-        output.force = - (alpha/target/R) * rdiff;
+        // For harmonic: output.force = k * (double(R0)/R - 1.0)*rdiff;
+        // For BRMC: outpu.force = - alpha/target * (unit vector in direction v-v0).
+        output.force = (alpha/target/double(R)) * rdiff; // Why is there a double cast here?
     }
 
 //    history.emplace_back(magnitude - R0);
