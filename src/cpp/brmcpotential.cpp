@@ -10,6 +10,87 @@
 namespace plugin
 {
 
+    BRMC::BRMC(double alpha,
+               double alpha_prev,
+               double mean,
+               double variance,
+               double A,
+               double tau,
+               double g,
+               double gsqrsum,
+               double eta,
+               bool converged,
+               double target,
+               unsigned int nSamples,
+               double samplePeriod):
+    alpha_{alpha},
+    alpha_prev_{alpha_prev},
+    mean_{mean},
+    variance_{variance},
+    A_{A},
+    tau_{tau},
+    g_{g},
+    gsqrsum_{gsqrsum},
+    eta_{eta},
+    converged_{converged},
+    target_{target},
+    nSamples_{nSamples},
+    samplePeriod_{samplePeriod},
+    nextSampleTime_{samplePeriod},
+    nextUpdateTime_{nSamples*tau}
+{};
+
+    BRMC::BRMC(const input_param_type &params) :
+            BRMC(params.alpha,
+                 params.alpha_prev,
+                 params.mean,
+                 params.variance,
+                 params.A,
+                 params.tau,
+                 params.g,
+                 params.gsqrsum,
+                 params.eta,
+                 params.converged,
+                 params.target,
+                 params.nSamples,
+                 params.samplePeriod)
+    {}
+    void BRMC::callback(gmx::Vector v, gmx::Vector v0, double t,
+                                           const EnsembleResources &resources) {
+
+        if (!converged_){
+            auto rdiff = v - v0;
+            const auto Rsquared = dot(rdiff,
+                                      rdiff);
+            const auto R = sqrt(Rsquared);
+
+            if (t >= nextSampleTime_){
+                // update mean and variance
+                int j = currentSample_++;
+                auto difference = R - mean_;
+                variance_ = variance_ + (j - 1) * pow(difference, 2) / j;
+                mean_ = mean_ + difference / j;
+
+                // Update next time to take a sample
+                nextSampleTime_ = (currentSample_ + 1)*samplePeriod_ + windowStartTime_;
+            }
+
+            if(t >= nextUpdateTime_){
+                assert(currentSample_ == nSamples_);
+
+                g_ = (1-mean_/target_)*variance_;
+                eta_ = A_/sqrt(gsqrsum_);
+                alpha_prev_ = alpha_;
+                alpha_ = alpha_prev_ - eta_*g_;
+
+                // Reset mean and variance
+                mean_ = R;
+                variance_ = 0;
+            }
+        }
+    }
+
+
 gmx::PotentialPointData BRMC::calculate(gmx::Vector v,
                                    gmx::Vector v0,
                                    gmx_unused double t)
@@ -26,29 +107,17 @@ gmx::PotentialPointData BRMC::calculate(gmx::Vector v,
 
     gmx::PotentialPointData output;
 
-    output.energy = alpha * R/target;
+    output.energy = alpha_ * R/target_;
     // Direction of force is ill-defined when v == v0
     if (R != 0)
     {
         // For harmonic: output.force = k * (double(R0)/R - 1.0)*rdiff;
         // For BRMC: outpu.force = - alpha/target * (unit vector in direction v-v0).
-        output.force = (alpha/target/double(R)) * rdiff; // Why is there a double cast here?
+        output.force = (alpha_/target_/double(R)) * rdiff; // Why is there a double cast here?
     }
 
 //    history.emplace_back(magnitude - R0);
     return output;
-}
-
-gmx::PotentialPointData BRMCRestraint::evaluate(gmx::Vector r1,
-                                                 gmx::Vector r2,
-                                                 double t)
-{
-    return calculate(r1, r2, t);
-}
-
-std::vector<unsigned long int> BRMCRestraint::sites() const
-{
-    return {site1_, site2_};
 }
 
 } // end namespace plugin
