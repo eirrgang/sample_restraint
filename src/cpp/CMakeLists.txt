@@ -1,11 +1,29 @@
-add_library(harmonicpotential SHARED
-            harmonicpotential.h
-            harmonicpotential.cpp)
+add_library(linearpotential SHARED
+        linearpotential.h
+        linearpotential.cpp)
 
+target_include_directories(linearpotential PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:include>
+        )
+
+# RPATH management
+# don't skip the full RPATH for the build tree
+set_target_properties(linearpotential PROPERTIES SKIP_BUILD_RPATH FALSE)
+
+# (but later on when installing)
+# If building with setuptools, CMake will not be performing the install
+set_target_properties(linearpotential PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+
+target_link_libraries(linearpotential PRIVATE Gromacs::gmxapi)
+
+add_library(harmonicpotential SHARED
+        harmonicpotential.h
+        harmonicpotential.cpp)
 target_include_directories(harmonicpotential PUBLIC
-                           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-                           $<INSTALL_INTERFACE:include>
-                           )
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:include>
+        )
 
 # RPATH management
 # don't skip the full RPATH for the build tree
