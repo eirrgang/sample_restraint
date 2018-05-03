@@ -44,7 +44,7 @@ gmx::PotentialPointData LinearRestraint::evaluate(gmx::Vector r1,
 
 std::vector<unsigned long int> LinearRestraint::sites() const
 {
-    return {site1_, site2_};
+    return sites_;
 }
 
 } // end namespace plugin

@@ -87,13 +87,11 @@ class Linear
 class LinearRestraint : public ::gmx::IRestraintPotential, private Linear
 {
     public:
-        LinearRestraint(unsigned long int site1,
-                          unsigned long int site2,
+        LinearRestraint(const std::vector<unsigned long> &sites,
                           real R0,
                           real k) :
             Linear{R0, k},
-            site1_{site1},
-            site2_{site2}
+            sites_{sites}
         {};
 
         std::vector<unsigned long int> sites() const override;
@@ -104,8 +102,7 @@ class LinearRestraint : public ::gmx::IRestraintPotential, private Linear
                                          double t) override;
 
     private:
-        unsigned long int site1_{0};
-        unsigned long int site2_{0};
+        std::vector<unsigned long> sites_;
 };
 
 class LinearModule : public gmxapi::MDModule
@@ -113,13 +110,11 @@ class LinearModule : public gmxapi::MDModule
     public:
         using param_t = Linear::input_param_type;
 
-        LinearModule(unsigned long int site1,
-                       unsigned long int site2,
+        LinearModule(std::vector<unsigned long int> sites,
                        real R0,
                        real k)
         {
-            site1_ = site1;
-            site2_ = site2;
+            sites_ = sites;
             R0_ = R0;
             k_ = k;
         }
@@ -137,7 +132,7 @@ class LinearModule : public gmxapi::MDModule
          */
         std::shared_ptr<gmx::IRestraintPotential> getRestraint() override
         {
-            auto restraint = std::make_shared<LinearRestraint>(site1_, site2_, R0_, k_);
+            auto restraint = std::make_shared<LinearRestraint>(sites_, R0_, k_);
             return restraint;
         }
 
@@ -150,20 +145,17 @@ class LinearModule : public gmxapi::MDModule
          * \param k
          * \param R0
          */
-        void setParams(unsigned long int site1,
-                        unsigned long int site2,
+        void setParams(std::vector<unsigned long int> sites,
                         real R0,
                         real k)
         {
-            site1_ = site1;
-            site2_ = site2;
+            sites_ = sites;
             R0_ = R0;
             k_ = k;
         }
 
     private:
-        unsigned long int site1_;
-        unsigned long int site2_;
+        std::vector<unsigned long int> sites_;
         real R0_;
         real k_;
 };
