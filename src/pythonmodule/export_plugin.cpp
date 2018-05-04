@@ -13,7 +13,8 @@
 
 #include "linearpotential.h"
 #include "harmonicpotential.h"
-#include "ensemblepotential.h"
+#include "brmcpotential.h"
+//#include "ensemblepotential.h"
 #include "make_unique.h"
 
 // Make a convenient alias to save some typing...
@@ -114,12 +115,18 @@ std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::HarmonicModule>::getModule
 }
 
 template<>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::getModule()
+std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::BRMCRestraint>>::getModule()
 {
     auto module = shared_from_this();
     assert(module != nullptr);
     return shared_from_this();
 }
+
+//template<>
+//std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::getModule()
+//{
+//    return shared_from_this();
+//}
 
 
 class MyRestraint
@@ -320,10 +327,10 @@ class HarmonicRestraintBuilder
         real springConstant_;
 };
 
-class EnsembleRestraintBuilder
+class BRMCRestraintBuilder
 {
     public:
-        explicit EnsembleRestraintBuilder(py::object element)
+        explicit BRMCRestraintBuilder(py::object element)
         {
             name_ = py::cast<std::string>(element.attr("name"));
             assert(!name_.empty());
@@ -343,27 +350,22 @@ class EnsembleRestraintBuilder
                 siteIndices_.emplace_back(py::cast<unsigned long>(site));
             }
 
-            auto nbins = py::cast<size_t>(parameter_dict["nbins"]);
-            auto binWidth = py::cast<double>(parameter_dict["binWidth"]);
-            auto minDist = py::cast<double>(parameter_dict["min_dist"]);
-            auto maxDist = pybind11::cast<double>(parameter_dict["max_dist"]);
-            auto experimental = pybind11::cast<std::vector<double>>(parameter_dict["experimental"]);
-            auto nSamples = pybind11::cast<unsigned int>(parameter_dict["nsamples"]);
-            auto samplePeriod = pybind11::cast<double>(parameter_dict["sample_period"]);
-            auto nWindows = pybind11::cast<unsigned int>(parameter_dict["nwindows"]);
-            auto k = pybind11::cast<double>(parameter_dict["k"]);
-            auto sigma = pybind11::cast<double>(parameter_dict["sigma"]);
+            auto A = py::cast<double>(parameter_dict["A"]);
+            auto tau = py::cast<double>(parameter_dict["tau"]);
+            auto target = py::cast<double>(parameter_dict["target"]);
+            auto nSamples = py::cast<unsigned int>(parameter_dict["nSamples"]);
 
-            auto params = plugin::makeEnsembleParams(nbins,
-                                                     binWidth,
-                                                     minDist,
-                                                     maxDist,
-                                                     experimental,
-                                                     nSamples,
-                                                     samplePeriod,
-                                                     nWindows,
-                                                     k,
-                                                     sigma);
+//            auto alpha = py::cast<double>(parameter_dict["alpha"]);
+//            auto alpha_prev = py::cast<double>(parameter_dict["alpha_prev"]);
+//            auto mean = py::cast<double>(parameter_dict["mean"]);
+//            auto variance = py::cast<double>(parameter_dict["variance"]);
+//            auto g = py::cast<double>(parameter_dict["g"]);
+//            auto gsqrsum = py::cast<double>(parameter_dict["gsqrsum"]);
+//            auto eta = py::cast<double>(parameter_dict["eta"]);
+//            auto converged = py::cast<bool>(parameter_dict["converged"]);
+//            auto samplePeriod = py::cast<double>(parameter_dict["samplePeriod"]);
+
+            auto params = plugin::makeBRMCParams(A, tau, target, nSamples);
             params_ = std::move(*params);
 
             // Note that if we want to grab a reference to the Context or its communicator, we can get it
@@ -404,7 +406,10 @@ class EnsembleRestraintBuilder
             // so we will create one here. Note: it looks like the SharedData element will be useful after all.
             auto resources = std::make_shared<plugin::EnsembleResources>(std::move(functor));
 
-            auto potential = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::create(name_, siteIndices_, params_, resources);
+            auto potential = PyRestraint<plugin::RestraintModule<plugin::BRMCRestraint>>::create(name_,
+                                                                                                 siteIndices_,
+                                                                                                 params_,
+                                                                                                 resources);
 
             auto subscriber = subscriber_;
             py::list potentialList = subscriber.attr("potential");
@@ -454,10 +459,125 @@ class EnsembleRestraintBuilder
         py::object context_;
         std::vector<unsigned long int> siteIndices_;
 
-        plugin::ensemble_input_param_type params_;
+        plugin::brmc_input_param_type params_;
 
         std::string name_;
 };
+
+//class EnsembleRestraintBuilder
+//{
+//    public:
+//        explicit EnsembleRestraintBuilder(py::object element)
+//        {
+//            name_ = py::cast<std::string>(element.attr("name"));
+//            assert(!name_.empty());
+//
+//            // It looks like we need some boilerplate exceptions for plugins so we have something to
+//            // raise if the element is invalid.
+//            assert(py::hasattr(element, "params"));
+//
+//            // Params attribute should be a Python list
+//            py::dict parameter_dict = element.attr("params");
+//            // \todo Check for the presence of these dictionary keys to avoid hard-to-diagnose error.
+//
+//            // Get positional parameters.
+//            py::list sites = parameter_dict["sites"];
+//            for (auto&& site : sites)
+//            {
+//                siteIndices_.emplace_back(py::cast<unsigned long>(site));
+//            }
+//
+//            auto nbins = py::cast<size_t>(parameter_dict["nbins"]);
+//            auto binWidth = py::cast<double>(parameter_dict["binWidth"]);
+//            auto minDist = py::cast<double>(parameter_dict["min_dist"]);
+//            auto maxDist = pybind11::cast<double>(parameter_dict["max_dist"]);
+//            auto experimental = pybind11::cast<std::vector<double>>(parameter_dict["experimental"]);
+//            auto nSamples = pybind11::cast<unsigned int>(parameter_dict["nsamples"]);
+//            auto samplePeriod = pybind11::cast<double>(parameter_dict["sample_period"]);
+//            auto nWindows = pybind11::cast<unsigned int>(parameter_dict["nwindows"]);
+//            auto k = pybind11::cast<double>(parameter_dict["k"]);
+//            auto sigma = pybind11::cast<double>(parameter_dict["sigma"]);
+//
+//            auto params = plugin::makeEnsembleParams(nbins,
+//                                                     binWidth,
+//                                                     minDist,
+//                                                     maxDist,
+//                                                     experimental,
+//                                                     nSamples,
+//                                                     samplePeriod,
+//                                                     nWindows,
+//                                                     k,
+//                                                     sigma);
+//            params_ = std::move(*params);
+//
+//            // Note that if we want to grab a reference to the Context or its communicator, we can get it
+//            // here through element.workspec._context. We need a more general API solution, but this code is
+//            // in the Python bindings code, so we know we are in a Python Context.
+//            assert(py::hasattr(element, "workspec"));
+//            auto workspec = element.attr("workspec");
+//            assert(py::hasattr(workspec, "_context"));
+//            context_ = workspec.attr("_context");
+//        }
+//
+//        /*!
+//         * \brief Add node(s) to graph for the work element.
+//         *
+//         * \param graph networkx.DiGraph object still evolving in gmx.context.
+//         *
+//         * \todo This may not follow the latest graph building protocol as described.
+//         */
+//        void build(py::object graph)
+//        {
+//            // Temporarily subvert things to get quick-and-dirty solution for testing.
+//            // Need to capture Python communicator and pybind syntax in closure so EnsembleResources
+//            // can just call with matrix arguments.
+//
+//            // This can be replaced with a subscription and delayed until launch, if necessary.
+//            assert(py::hasattr(context_, "ensemble_update"));
+//            // make a local copy of the Python object so we can capture it in the lambda
+//            auto update = context_.attr("ensemble_update");
+//            // Make a bindings-independent callable with standardizeable signature.
+//            auto name = py::str(name_);
+//            auto functor = [update, name](const plugin::Matrix<double>& send,
+//                                    plugin::Matrix<double>* receive)
+//            {
+//                update(send, receive, name);
+//            };
+//
+//            // To use a reduce function on the Python side, we need to provide it with a Python buffer-like object,
+//            // so we will create one here. Note: it looks like the SharedData element will be useful after all.
+//            auto resources = std::make_shared<plugin::EnsembleResources>(std::move(functor));
+//
+//            auto potential = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::create(name_, siteIndices_, params_, resources);
+//
+//            auto subscriber = subscriber_;
+//            py::list potentialList = subscriber.attr("potential");
+//            potentialList.append(potential);
+//
+//        };
+//
+//        /*!
+//         * \brief Accept subscription of an MD task.
+//         *
+//         * \param subscriber Python object with a 'potential' attribute that is a Python list.
+//         *
+//         * During build, an object is added to the subscriber's self.potential, which is then bound with
+//         * system.add_potential(potential) during the subscriber's launch()
+//         */
+//        void addSubscriber(py::object subscriber)
+//        {
+//            assert(py::hasattr(subscriber, "potential"));
+//            subscriber_ = subscriber;
+//        };
+//
+//        py::object subscriber_;
+//        py::object context_;
+//        std::vector<unsigned long int> siteIndices_;
+//
+//        plugin::ensemble_input_param_type params_;
+//
+//        std::string name_;
+//};
 
 std::unique_ptr<LinearRestraintBuilder> createLinearBuilder(const py::object element)
 {
@@ -471,12 +591,19 @@ std::unique_ptr<HarmonicRestraintBuilder> createHarmonicBuilder(const py::object
     return builder;
 }
 
-std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object element)
+std::unique_ptr<BRMCRestraintBuilder> createBRMCBuilder(const py::object element)
 {
     using gmx::compat::make_unique;
-    auto builder = make_unique<EnsembleRestraintBuilder>(element);
+    auto builder = make_unique<BRMCRestraintBuilder>(element);
     return builder;
 }
+
+//std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object element)
+//{
+//    using gmx::compat::make_unique;
+//    auto builder = make_unique<EnsembleRestraintBuilder>(element);
+//    return builder;
+//}
 
 // The first argument is the name of the module when importing to Python. This should be the same as the name specified
 // as the OUTPUT_NAME for the shared object library in the CMakeLists.txt file. The second argument, 'm', can be anything
@@ -577,19 +704,34 @@ PYBIND11_MODULE(myplugin, m) {
     //harmonic.def_property(name, getter, setter, extra)
 //    harmonic.def_property("pairs", &PyRestraint<plugin::HarmonicModule>::getPairs, &PyRestraint<plugin::HarmonicModule>::setPairs, "The indices of particle pairs to restrain");
 
-    // Builder to be returned from create_restraint
-    pybind11::class_<EnsembleRestraintBuilder> ensembleBuilder(m, "EnsembleBuilder");
-    ensembleBuilder.def("add_subscriber",
-                         &EnsembleRestraintBuilder::addSubscriber);
-    ensembleBuilder.def("build", &EnsembleRestraintBuilder::build);
+        // Builder to be returned from brmc_restraint
+    pybind11::class_<BRMCRestraintBuilder> brmcBuilder(m, "BRMCBuilder");
+    brmcBuilder.def("add_subscriber",
+                         &BRMCRestraintBuilder::addSubscriber);
+    brmcBuilder.def("build", &BRMCRestraintBuilder::build);
 
-    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>;
-    py::class_<plugin::EnsembleRestraint::input_param_type> ensembleParams(m, "EnsembleRestraintParams");
+    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::BRMCRestraint>>;
+    py::class_<plugin::BRMCRestraint::input_param_type> brmcParams(m, "BRMCRestraintParams");
     // Builder to be returned from ensemble_restraint
     // API object to build.
-    py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(m, "EnsembleRestraint");
+    py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> brmc(m, "BRMCRestraint");
     // EnsembleRestraint can only be created via builder for now.
-    ensemble.def("bind", &PyEnsemble::bind, "Implement binding protocol");
+    brmc.def("bind", &PyEnsemble::bind, "Implement binding protocol");
+
+
+//    // Builder to be returned from create_restraint
+//    pybind11::class_<EnsembleRestraintBuilder> ensembleBuilder(m, "EnsembleBuilder");
+//    ensembleBuilder.def("add_subscriber",
+//                         &EnsembleRestraintBuilder::addSubscriber);
+//    ensembleBuilder.def("build", &EnsembleRestraintBuilder::build);
+//
+//    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>;
+//    py::class_<plugin::EnsembleRestraint::input_param_type> ensembleParams(m, "EnsembleRestraintParams");
+//    // Builder to be returned from ensemble_restraint
+//    // API object to build.
+//    py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(m, "EnsembleRestraint");
+//    // EnsembleRestraint can only be created via builder for now.
+//    ensemble.def("bind", &PyEnsemble::bind, "Implement binding protocol");
 
 
     /*
@@ -599,11 +741,13 @@ PYBIND11_MODULE(myplugin, m) {
      * The build() method returns None or a launcher. A launcher has a signature like launch(rank) and
      * returns None or a runner.
      */
-    m.def("make_ensemble_params",
-          &plugin::makeEnsembleParams);
-    m.def("create_restraint", [](const py::object element){ return createHarmonicBuilder(element); });
-    m.def("ensemble_restraint", [](const py::object element){ return createEnsembleBuilder(element); });
+//    m.def("make_ensemble_params",&plugin::makeEnsembleParams);
+
     m.def("linear_restraint", [](const py::object element){return createLinearBuilder(element);});
+    m.def("create_restraint", [](const py::object element){ return createHarmonicBuilder(element); });
+    m.def("brmc_restraint", [](const py::object element){ return createBRMCBuilder(element); });
+//    m.def("ensemble_restraint", [](const py::object element){ return createEnsembleBuilder(element); });
+
 
     // Matrix utility class (temporary). Borrowed from http://pybind11.readthedocs.io/en/master/advanced/pycpp/numpy.html#arrays
     py::class_<plugin::Matrix<double>, std::shared_ptr<plugin::Matrix<double>>>(m, "Matrix", py::buffer_protocol())

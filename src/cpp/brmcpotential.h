@@ -294,10 +294,12 @@ class BRMCRestraint : public ::gmx::IRestraintPotential, private BRMC
     public:
         using BRMC::input_param_type;
         BRMCRestraint(const std::vector<unsigned long> &sites,
-                      const input_param_type &params):
+                      const input_param_type &params,
+                      std::shared_ptr<EnsembleResources> resources):
             BRMC(params),
-            sites_{sites}
-        {};
+            sites_{sites},
+            resources_{std::move(resources)}
+        {}
 
     std::vector<unsigned long int> sites() const override
     {

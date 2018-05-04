@@ -10,6 +10,8 @@
 namespace plugin
 {
 
+    template class ::plugin::Matrix<double>;
+
     BRMC::BRMC(double alpha,
                double alpha_prev,
                double mean,
@@ -120,4 +122,5 @@ gmx::PotentialPointData BRMC::calculate(gmx::Vector v,
     return output;
 }
 
+    template class ::plugin::RestraintModule<BRMCRestraint>;
 } // end namespace plugin
