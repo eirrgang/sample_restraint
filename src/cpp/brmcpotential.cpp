@@ -63,6 +63,7 @@ namespace plugin
                  params.currentSample,
                  params.windowStartTime)
     {}
+
     void BRMC::callback(gmx::Vector v, gmx::Vector v0, double t,
                                            const EnsembleResources &resources) {
 
@@ -80,26 +81,21 @@ namespace plugin
                 int j = currentSample_+1;
                 auto difference = (R - mean_);
                 auto diffsqr = difference*difference;
-//                printf("Difference, j: %f, %d\n", difference, j);
-//                printf("Mean and variance: %f, %f\n", mean_, variance_);
                 variance_ = variance_ + (j - 1) * diffsqr / j;
-                mean_ = mean_ + difference / j;
-//                printf("Difference, j: %f, %d\n", difference, j);
-//                printf("Mean and variance: %f, %f\n", mean_, variance_);
-                // Update next time to take a sample
+                mean_ = mean_ + difference / j;\
                 currentSample_++;
                 nextSampleTime_ = (currentSample_ + 1)*samplePeriod_ + windowStartTime_;
             }
 
             if(t >= nextUpdateTime_){
                 assert(currentSample_ == nSamples_);
-                printf("Alpha: %f", alpha_);
                 g_ = (1-mean_/target_)*variance_;
+                gsqrsum_ = gsqrsum_ + g_*g_;
                 eta_ = A_/sqrt(gsqrsum_);
                 alpha_prev_ = alpha_;
                 alpha_ = alpha_prev_ - eta_*g_;
 
-                printf("alpha: %f", alpha_);
+                printf("alpha: %f\n", alpha_);
                 // Reset mean and variance
                 mean_ = R;
                 variance_ = 0;
@@ -110,8 +106,13 @@ namespace plugin
                 currentSample_ = 0;
                 // Reset sample times.
                 nextSampleTime_ = t + samplePeriod_;
+
+                if (abs(alpha_ - alpha_prev_) < 0.05){
+                    converged_ = TRUE;
+                }
             }
         }
+        // TODO: stop simulation if alpha has converged
     }
 
 
