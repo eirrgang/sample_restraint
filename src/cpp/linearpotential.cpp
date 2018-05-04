@@ -17,21 +17,20 @@ gmx::PotentialPointData Linear::calculate(gmx::Vector v,
     auto rdiff = v0 - v; // Taking v0-v just let's me not apply a negative sign for output.force.
     const auto Rsquared = dot(rdiff, rdiff);
     const auto R = sqrt(Rsquared);
+    const auto Rdiff = R-R0;
+    const auto Rdiffsqared = Rdiff*Rdiff;
+    const auto diffR = sqrt(Rdiffsqared);
     // TODO: find appropriate math header and namespace
 
-    // Potential energy is 0.5 * k * (norm(r1) - R0)**2
-    // Force in direction of r1 is -k * (norm(r1) - R0) * r1/norm(r1)
     gmx::PotentialPointData output;
-    // output.energy = real(0.5) * k * (norm(r1) - R0) * (norm(r1) - R0);
-    output.energy = k * (R-R0);
+
+    output.energy = k * diffR;
     // Direction of force is ill-defined when v == v0
     if (R != 0)
     {
         // F = -k * (1.0 - R0/norm(r1)) * r1
         output.force = k/R * rdiff;
     }
-
-//    history.emplace_back(magnitude - R0);
     return output;
 }
 
