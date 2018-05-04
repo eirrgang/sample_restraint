@@ -363,9 +363,9 @@ class BRMCRestraintBuilder
 //            auto gsqrsum = py::cast<double>(parameter_dict["gsqrsum"]);
 //            auto eta = py::cast<double>(parameter_dict["eta"]);
 //            auto converged = py::cast<bool>(parameter_dict["converged"]);
-//            auto samplePeriod = py::cast<double>(parameter_dict["samplePeriod"]);
+            auto samplePeriod = py::cast<double>(parameter_dict["samplePeriod"]);
 
-            auto params = plugin::makeBRMCParams(A, tau, target, nSamples);
+            auto params = plugin::makeBRMCParams(A, tau, target, nSamples, samplePeriod);
             params_ = std::move(*params);
 
             // Note that if we want to grab a reference to the Context or its communicator, we can get it
