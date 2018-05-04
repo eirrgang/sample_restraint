@@ -185,8 +185,7 @@ namespace plugin
         unsigned int nSamples{0};
         unsigned int currentSample{0};
         double samplePeriod{0};
-        double nextUpdateTime{0};
-
+        double windowStartTime{0};
     };
 
 // \todo We should be able to automate a lot of the parameter setting stuff
@@ -198,7 +197,8 @@ namespace plugin
     makeBRMCParams(double A,
                    double tau,
                    double target,
-                   unsigned int nSamples)
+                   unsigned int nSamples,
+                   double samplePeriod)
     {
         using gmx::compat::make_unique;
         auto params = make_unique<brmc_input_param_type>();
@@ -206,6 +206,7 @@ namespace plugin
         params->tau = tau;
         params->target = target;
         params->nSamples = nSamples;
+        params->samplePeriod = samplePeriod;
 
         return params;
     };
@@ -231,7 +232,9 @@ class BRMC
              bool converged,
              double target,
              unsigned int nSamples,
-             double samplePeriod);
+             double samplePeriod,
+             unsigned int currentSample,
+             double windowStartTime);
 
         // If dispatching this virtual function is not fast enough, the compiler may be able to better optimize a free
         // function that receives the current restraint as an argument.
