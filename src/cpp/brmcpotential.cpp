@@ -25,7 +25,7 @@ namespace plugin
                double tolerance,
                double target,
                unsigned int nSamples,
-               double samplePeriod,
+//               double samplePeriod,
                unsigned int currentSample,
                double windowStartTime):
     alpha_{alpha},
@@ -41,9 +41,11 @@ namespace plugin
     tolerance_{tolerance},
     target_{target},
     nSamples_{nSamples},
-    samplePeriod_{samplePeriod},
-    nextSampleTime_{samplePeriod},
-    nextUpdateTime_{nSamples*samplePeriod},
+    samplePeriod_{tau/nSamples},
+//    nextSampleTime_{samplePeriod},
+//    nextUpdateTime_{nSamples*samplePeriod},
+    nextSampleTime_{samplePeriod_},
+    nextUpdateTime_{tau},
     currentSample_{currentSample},
     windowStartTime_{windowStartTime}
 {};
@@ -62,7 +64,7 @@ namespace plugin
                  params.tolerance,
                  params.target,
                  params.nSamples,
-                 params.samplePeriod,
+//                 params.samplePeriod,
                  params.currentSample,
                  params.windowStartTime)
     {}

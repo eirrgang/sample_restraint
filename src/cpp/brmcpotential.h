@@ -199,8 +199,8 @@ namespace plugin
                    double tau,
                    double tolerance,
                    double target,
-                   unsigned int nSamples,
-                   double samplePeriod)
+                   unsigned int nSamples)
+//                   double samplePeriod)
     {
         using gmx::compat::make_unique;
         auto params = make_unique<brmc_input_param_type>();
@@ -209,7 +209,7 @@ namespace plugin
         params->tolerance = tolerance;
         params->target = target;
         params->nSamples = nSamples;
-        params->samplePeriod = samplePeriod;
+//        params->samplePeriod = samplePeriod;
 
         return params;
     };
@@ -236,7 +236,7 @@ class BRMC
              double tolerance,
              double target,
              unsigned int nSamples,
-             double samplePeriod,
+//             double samplePeriod,
              unsigned int currentSample,
              double windowStartTime);
 
