@@ -22,6 +22,7 @@ namespace plugin
                double gsqrsum,
                double eta,
                bool converged,
+               double tolerance,
                double target,
                unsigned int nSamples,
                double samplePeriod,
@@ -37,6 +38,7 @@ namespace plugin
     gsqrsum_{gsqrsum},
     eta_{eta},
     converged_{converged},
+    tolerance_{tolerance},
     target_{target},
     nSamples_{nSamples},
     samplePeriod_{samplePeriod},
@@ -57,6 +59,7 @@ namespace plugin
                  params.gsqrsum,
                  params.eta,
                  params.converged,
+                 params.tolerance,
                  params.target,
                  params.nSamples,
                  params.samplePeriod,
@@ -107,7 +110,7 @@ namespace plugin
                 // Reset sample times.
                 nextSampleTime_ = t + samplePeriod_;
 
-                if (abs(alpha_ - alpha_prev_) < 0.05){
+                if (abs(alpha_ - alpha_prev_) < tolerance_){
                     converged_ = TRUE;
                 }
             }

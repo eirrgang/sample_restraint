@@ -177,6 +177,7 @@ namespace plugin
         double gsqrsum{0};
         double eta{0};
         bool converged{0};
+        double tolerance{0.05};
 
         /// target distance
         double target{0};
@@ -196,6 +197,7 @@ namespace plugin
     std::unique_ptr<brmc_input_param_type>
     makeBRMCParams(double A,
                    double tau,
+                   double tolerance,
                    double target,
                    unsigned int nSamples,
                    double samplePeriod)
@@ -204,6 +206,7 @@ namespace plugin
         auto params = make_unique<brmc_input_param_type>();
         params->A = A;
         params->tau = tau;
+        params->tolerance = tolerance;
         params->target = target;
         params->nSamples = nSamples;
         params->samplePeriod = samplePeriod;
@@ -230,6 +233,7 @@ class BRMC
              double gsqrsum,
              double eta,
              bool converged,
+             double tolerance,
              double target,
              unsigned int nSamples,
              double samplePeriod,
@@ -276,6 +280,7 @@ class BRMC
         double gsqrsum_;
         double eta_;
         bool converged_;
+        double tolerance_;
 
         /// target distance
         double target_;
