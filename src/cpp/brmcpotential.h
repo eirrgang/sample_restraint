@@ -187,6 +187,8 @@ namespace plugin
         unsigned int currentSample{0};
         double samplePeriod{0};
         double windowStartTime{0};
+
+        std::string parameter_filename;
     };
 
 // \todo We should be able to automate a lot of the parameter setting stuff
@@ -199,7 +201,8 @@ namespace plugin
                    double tau,
                    double tolerance,
                    double target,
-                   unsigned int nSamples)
+                   unsigned int nSamples,
+                   std::string parameter_filename)
 //                   double samplePeriod)
     {
         using gmx::compat::make_unique;
@@ -209,6 +212,7 @@ namespace plugin
         params->tolerance = tolerance;
         params->target = target;
         params->nSamples = nSamples;
+        params->parameter_filename = parameter_filename;
 //        params->samplePeriod = samplePeriod;
 
         return params;
@@ -238,13 +242,16 @@ class BRMC
              unsigned int nSamples,
 //             double samplePeriod,
              unsigned int currentSample,
-             double windowStartTime);
+             double windowStartTime,
+             std::string parameter_filename);
 
         // If dispatching this virtual function is not fast enough, the compiler may be able to better optimize a free
         // function that receives the current restraint as an argument.
         gmx::PotentialPointData calculate(gmx::Vector v,
                                           gmx::Vector v0,
                                           gmx_unused double t);
+
+        void writeparameters(double t, const double R);
 
         // An update function to be called on the simulation master rank/thread periodically by the Restraint framework.
         void callback(gmx::Vector v,
@@ -286,6 +293,7 @@ class BRMC
         double target_;
 
         /// Number of samples to store during each window.
+        /// Number of samples to store during each window.
         unsigned int nSamples_;
         unsigned int currentSample_;
         double samplePeriod_;
@@ -293,6 +301,10 @@ class BRMC
 
         double windowStartTime_;
         double nextUpdateTime_;
+
+        std::string parameter_filename_;
+        FILE *parameter_file_;
+
 };
 
 // implement IRestraintPotential in terms of BRMC

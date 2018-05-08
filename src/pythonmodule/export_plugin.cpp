@@ -355,6 +355,7 @@ class BRMCRestraintBuilder
             auto tolerance = py::cast<double>(parameter_dict["tolerance"]);
             auto target = py::cast<double>(parameter_dict["target"]);
             auto nSamples = py::cast<unsigned int>(parameter_dict["nSamples"]);
+            auto parameter_filename = py::cast<std::string>(parameter_dict["parameter_filename"]);
 
 //            auto alpha = py::cast<double>(parameter_dict["alpha"]);
 //            auto alpha_prev = py::cast<double>(parameter_dict["alpha_prev"]);
@@ -366,7 +367,11 @@ class BRMCRestraintBuilder
 //            auto converged = py::cast<bool>(parameter_dict["converged"]);
 //            auto samplePeriod = py::cast<double>(parameter_dict["samplePeriod"]);
 
-            auto params = plugin::makeBRMCParams(A, tau, tolerance, target, nSamples); //samplePeriod);
+            auto params = plugin::makeBRMCParams(A, tau,
+                                                 tolerance,
+                                                 target,
+                                                 nSamples,
+                                                 parameter_filename); //samplePeriod);
             params_ = std::move(*params);
 
             // Note that if we want to grab a reference to the Context or its communicator, we can get it

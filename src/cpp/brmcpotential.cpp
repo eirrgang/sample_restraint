@@ -27,7 +27,8 @@ namespace plugin
                unsigned int nSamples,
 //               double samplePeriod,
                unsigned int currentSample,
-               double windowStartTime):
+               double windowStartTime,
+               std::string parameter_filename):
     alpha_{alpha},
     alpha_prev_{alpha_prev},
     mean_{mean},
@@ -47,7 +48,8 @@ namespace plugin
     nextSampleTime_{samplePeriod_},
     nextUpdateTime_{tau},
     currentSample_{currentSample},
-    windowStartTime_{windowStartTime}
+    windowStartTime_{windowStartTime},
+    parameter_filename_{parameter_filename}
 {};
 
     BRMC::BRMC(const input_param_type &params) :
@@ -66,8 +68,15 @@ namespace plugin
                  params.nSamples,
 //                 params.samplePeriod,
                  params.currentSample,
-                 params.windowStartTime)
+                 params.windowStartTime,
+                 params.parameter_filename)
     {}
+
+    void BRMC::writeparameters(double t, const double R){
+        fprintf(parameter_file_,
+                "%f\t%f\t%f\t%d\t%f\t%f\t%f\n",
+                t, R, target_, converged_, alpha_, g_, eta_);
+    }
 
     void BRMC::callback(gmx::Vector v, gmx::Vector v0, double t,
                                            const EnsembleResources &resources) {
@@ -79,6 +88,9 @@ namespace plugin
             const auto R = sqrt(Rsquared);
             if (t == 0){
                 mean_ = R;
+                parameter_file_ = fopen(parameter_filename_.c_str(), "w");
+                fprintf(parameter_file_, "time\tR\ttarget\tconverged\talpha\tg\teta\n");
+                writeparameters(t, R);
             }
 
             if (t >= nextSampleTime_){
@@ -111,9 +123,12 @@ namespace plugin
                 currentSample_ = 0;
                 // Reset sample times.
                 nextSampleTime_ = t + samplePeriod_;
+                writeparameters(t, R);
 
                 if (abs(alpha_ - alpha_prev_) < tolerance_){
                     converged_ = TRUE;
+                    writeparameters(t, R);
+                    fclose(parameter_file_);
                 }
             }
         }
