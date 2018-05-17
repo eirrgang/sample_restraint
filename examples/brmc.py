@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 """Test BRMC restraint"""
 
 import sys
@@ -39,16 +39,22 @@ params1 = {
     'sites': [422, 2955, 2028],
     'A': 20,
     'tau': 0.5,
+    'tolerance': 0.05,
     'target': 5.0,
-    'nSamples': 100
+    'nSamples': 3,
+    'parameter_filename': "params52210.log"
+    # 'samplePeriod': 0.1
 }
 
 params2 = {
     'sites': [1287, 3059, 2028],
     'A': 20,
     'tau': 0.5,
+    'tolerance': 0.05,
     'target': 4.0,
-    'nSamples': 100
+    'nSamples': 3,
+    'parameter_filename': "params105216.log"
+    # 'samplePeriod': 0.1
 }
 #
 potential1 = gmx.workflow.WorkElement(
