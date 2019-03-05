@@ -24,113 +24,6 @@
 // Make a convenient alias to save some typing...
 namespace py = pybind11;
 
-////////////////////////////////
-// Begin PyRestraint static code
-/*!
- * \brief Templated wrapper to use in Python bindings.
- *
- * Boilerplate
- *
- * Mix-in from below. Adds a bind behavior, a getModule() method to get a gmxapi::MDModule adapter,
- * and a create() method that assures a single shared_ptr record for an object that may sometimes
- * be referred to by a raw pointer and/or have shared_from_this called.
- * \tparam T class implementing gmx::IRestraintPotential
- *
- */
-template<class T>
-class PyRestraint : public T, public std::enable_shared_from_this<PyRestraint<T>>
-{
-    public:
-        void bind(py::object object);
-
-        using T::name;
-
-        /*!
-         * \brief
-         *
-         * T must either derive from gmxapi::MDModule or provide a template specialization for
-         * PyRestraint<T>::getModule(). If T derives from gmxapi::MDModule, we can keep a weak pointer
-         * to ourself and generate a shared_ptr on request, but std::enable_shared_from_this already
-         * does that, so we use it when we can.
-         * \return
-         */
-        std::shared_ptr<gmxapi::MDModule> getModule();
-
-        /*!
-         * \brief Factory function to get a managed pointer to a new restraint.
-         *
-         * \tparam ArgsT
-         * \param args
-         * \return
-         */
-        template<typename ... ArgsT>
-        static std::shared_ptr<PyRestraint<T>> create(ArgsT... args)
-        {
-            auto newRestraint = std::make_shared<PyRestraint<T>>(args...);
-            return newRestraint;
-        }
-
-        template<typename ... ArgsT>
-        explicit PyRestraint(ArgsT... args) :
-            T{args...}
-        {}
-
-};
-
-/*!
- * \brief Implement the gmxapi binding protocol for restraints.
- *
- * All restraints will use this same code automatically.
- *
- * \tparam T restraint class exported below.
- * \param object Python Capsule object to allow binding with a simple C API.
- */
-template<class T>
-void PyRestraint<T>::bind(py::object object)
-{
-    PyObject * capsule = object.ptr();
-    if (PyCapsule_IsValid(capsule,
-                          gmxapi::MDHolder::api_name))
-    {
-        auto holder = static_cast<gmxapi::MDHolder*>(PyCapsule_GetPointer(capsule,
-                                                                          gmxapi::MDHolder::api_name));
-        auto workSpec = holder->getSpec();
-        std::cout << this->name() << " received " << holder->name();
-        std::cout << " containing spec of size ";
-        std::cout << workSpec->getModules().size();
-        std::cout << std::endl;
-
-        auto module = getModule();
-        workSpec->addModule(module);
-    }
-    else
-    {
-        throw gmxapi::ProtocolError("bind method requires a python capsule as input");
-    }
-}
-// end PyRestraint static code
-//////////////////////////////
-
-
-/*!
- * \brief Interact with the restraint framework and gmxapi when launching a simulation.
- *
- * This should be generalized and removed from here. Unfortunately, some things need to be
- * standardized first. If a potential follows the example of EnsembleRestraint or HarmonicRestraint,
- * the template specializations below can be mimicked to give GROMACS access to the potential.
- *
- * \tparam T class implementing the gmxapi::MDModule interface.
- * \return shared ownership of a T object via the gmxapi::MDModule interface.
- */
-// If T is derived from gmxapi::MDModule, create a default-constructed std::shared_ptr<T>
-// \todo Need a better default that can call a shared_from_this()
-template<class T>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<T>::getModule()
-{
-    auto module = std::make_shared<typename std::enable_if<std::is_base_of<gmxapi::MDModule, T>::value, T>::type>();
-    return module;
-}
-
 template<>
 std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::getModule()
 {
@@ -139,38 +32,6 @@ std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::En
 //////////////////////////////////////////////////////////////////////////////////////////
 // New restraints mimicking EnsembleRestraint should specialize getModule() here as above.
 //////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-////////////////////
-// Begin MyRestraint
-/*!
- * \brief No-op restraint class for testing and demonstration.
- */
-class MyRestraint
-{
-    public:
-        static const char* docstring;
-
-        static std::string name()
-        { return "MyRestraint"; };
-};
-
-template<>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<MyRestraint>::getModule()
-{
-    auto module = std::make_shared<gmxapi::MDModule>();
-    return module;
-}
-
-
-// Raw string will have line breaks and indentation as written between the delimiters.
-const char* MyRestraint::docstring =
-    R"rawdelimiter(Some sort of custom potential.
-)rawdelimiter";
-// end MyRestraint
-//////////////////
-
 
 class EnsembleRestraintBuilder
 {
@@ -361,44 +222,6 @@ PYBIND11_MODULE(myplugin, m) {
                  sizeof(double)}
             );
         });
-
-
-    // New plan: Instead of inheriting from gmx.core.MDModule, we can use a local import of
-    // gmxapi::MDModule in both gmxpy and in extension modules. When md.add_potential() is
-    // called, instead of relying on a binary interface to the MDModule, it will pass itself
-    // as an argument to that module's bind() method. Then, all MDModules are dependent only
-    // on libgmxapi as long as they provide the required function name. This is in line with
-    // the Pythonic idiom of designing interfaces around functions instead of classes.
-    //
-    // Example: calling md.add_potential(mypotential) in Python causes to be called mypotential.bind(api_object), where
-    // api_object is a member of `md` that is a type exposed directly from gmxapi with
-    // module_local bindings. To interact properly, then, mypotential just has to be something with a
-    // bind() method that takes the same sort of gmxapi object, such as is defined locally. For simplicity
-    // and safety, this gmxapi object will be something like
-    // class MdContainer { public: shared_ptr<Md> md; };
-    // and the bind method will grab and operate on the member pointer. It is possible to work
-    // with the reference counting and such in Python, but it is easier and more compatible with
-    // other Python extensions if we just keep the bindings as simple as possible and manage
-    // object lifetime and ownership entirely in C++.
-    //
-    // We can provide a header or document in gmxapi or gmxpy specifically with the the set of containers
-    // necessary to interact with gmxpy in a bindings-agnostic way, and in gmxpy and/or this repo, we can provide an export
-    // function that provides pybind11 bindings.
-
-    // Make a null restraint for testing.
-    py::class_<PyRestraint<MyRestraint>, std::shared_ptr<PyRestraint<MyRestraint>>> md_module(m,
-                                                                                              "MyRestraint");
-    md_module.def(
-        py::init<>(
-                []() { return PyRestraint<MyRestraint>::create(); }
-            ),
-            "Create default MyRestraint"
-        );
-    md_module.def("bind",
-                  &PyRestraint<MyRestraint>::bind);
-    // This bindings specification could actually be done in a templated function to automatically
-    // generate parameter setters/getters
-
 
     //////////////////////////////////////////////////////////////////////////
     // Begin EnsembleRestraint
