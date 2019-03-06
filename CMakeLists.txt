@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4.3)
 # If you are using this repository as a template, you should probably change the
 # project name and adopt your own versioning scheme.
-project(sample_restraint VERSION 0.0.7)
+project(mdstring VERSION 0.0.0)
 
 # This project requires a GROMACS supporting gmxapi 0.0.7 or higher. It should
 # be sufficient to source the GMXRC, but you can also set the GROMACS_DIR or

@@ -21,13 +21,13 @@
 namespace plugin
 {
 
-// Stop-gap for cross-language data exchange pending SharedData implementation and inclusion of Eigen.
+// Stop-gap for cross-language data exchange pending GROMACS updates.
 // Adapted from pybind docs.
 template<class T>
-class Matrix
+class Matrix2D
 {
     public:
-        Matrix(size_t rows,
+        Matrix2D(size_t rows,
                size_t cols) :
             rows_(rows),
             cols_(cols),
@@ -36,7 +36,7 @@ class Matrix
         {
         }
 
-        explicit Matrix(std::vector<T>&& captured_data) :
+        explicit Matrix2D(std::vector<T>&& captured_data) :
             rows_{1},
             cols_{captured_data.size()},
             data_{std::move(captured_data)}
@@ -63,7 +63,7 @@ class Matrix
 
 // Defer implicit instantiation to ensemblepotential.cpp
 extern template
-class Matrix<double>;
+class Matrix2D<double>;
 
 /*!
  * \brief An active handle to ensemble resources provided by the Context.
@@ -101,7 +101,7 @@ class Matrix<double>;
  * If no other consumers of the data request ownership, the ownership can be transferred without a copy. Otherwise, a
  * copy is made.
  */
-class EnsembleResourceHandle
+class ResourcesHandle
 {
     public:
         /*!
@@ -110,8 +110,8 @@ class EnsembleResourceHandle
          * \param send Matrices to be summed across the ensemble using Context resources.
          * \param receive destination of reduced data instead of updating internal Matrix.
          */
-        void reduce(const Matrix<double>& send,
-                    Matrix<double>* receive) const;
+        void reduce(const Matrix2D<double>& send,
+                    Matrix2D<double>* receive) const;
 
         /*!
          * \brief Issue a stop condition event.
@@ -122,8 +122,8 @@ class EnsembleResourceHandle
         void stop();
 
         // to be abstracted and hidden...
-        const std::function<void(const Matrix<double>&,
-                                 Matrix<double>*)>* reduce_;
+        const std::function<void(const Matrix2D<double>&,
+                                 Matrix2D<double>*)>* reduce_;
 
         gmxapi::SessionResources* session_;
 };
@@ -137,7 +137,7 @@ class EnsembleResourceHandle
  *
  * gmxapi version 0.1.0 will provide this functionality through SessionResources.
  */
-class EnsembleResources
+class Resources
 {
     public:
         /*!
@@ -150,8 +150,8 @@ class EnsembleResources
          *
          * \param reduce ownership of a function object providing ensemble averaging of a 2D matrix.
          */
-        explicit EnsembleResources(std::function<void(const Matrix<double>&,
-                                                      Matrix<double>*)>&& reduce) :
+        explicit Resources(std::function<void(const Matrix2D<double>&,
+                                                      Matrix2D<double>*)>&& reduce) :
             reduce_(reduce),
             session_(nullptr)
         {};
@@ -172,7 +172,7 @@ class EnsembleResources
          * In this release, the only facility provided by the resources is a function object for
          * the ensemble averaging function provided by the Context.
          */
-        EnsembleResourceHandle getHandle() const;
+        ResourcesHandle getHandle() const;
 
         /*!
          * \brief Acquires a pointer to a Session managing these resources.
@@ -183,8 +183,8 @@ class EnsembleResources
 
     private:
         //! bound function object to provide ensemble reduce facility.
-        std::function<void(const Matrix<double>&,
-                           Matrix<double>*)> reduce_;
+        std::function<void(const Matrix2D<double>&,
+                           Matrix2D<double>*)> reduce_;
 
         // Raw pointer to the session in which these resources live.
         gmxapi::SessionResources* session_;
@@ -223,7 +223,7 @@ class RestraintModule : public gmxapi::MDModule // consider names
         RestraintModule(std::string name,
                         std::vector<int> sites,
                         const typename R::input_param_type& params,
-                        std::shared_ptr<EnsembleResources> resources) :
+                        std::shared_ptr<Resources> resources) :
             sites_{std::move(sites)},
             params_{params},
             resources_{std::move(resources)},
@@ -275,7 +275,7 @@ class RestraintModule : public gmxapi::MDModule // consider names
         param_t params_;
 
         // Need to figure out if this is copyable or who owns it.
-        std::shared_ptr<EnsembleResources> resources_;
+        std::shared_ptr<Resources> resources_;
 
         const std::string name_;
         std::shared_ptr<R> restraint_{nullptr};

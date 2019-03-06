@@ -16,10 +16,10 @@ namespace plugin
 
 // Explicit instantiation.
 template
-class ::plugin::Matrix<double>;
+class ::plugin::Matrix2D<double>;
 
-void EnsembleResourceHandle::reduce(const Matrix<double>& send,
-                                    Matrix<double>* receive) const
+void ResourcesHandle::reduce(const Matrix2D<double>& send,
+                                    Matrix2D<double>* receive) const
 {
     assert(reduce_);
     if (*reduce_)
@@ -33,7 +33,7 @@ void EnsembleResourceHandle::reduce(const Matrix<double>& send,
     }
 }
 
-void EnsembleResourceHandle::stop()
+void ResourcesHandle::stop()
 {
     assert(session_);
     auto signaller = gmxapi::getMdrunnerSignal(session_,
@@ -43,14 +43,14 @@ void EnsembleResourceHandle::stop()
     signaller();
 }
 //
-//gmxapi::session::OutputStream* EnsembleResourceHandle::ostream()
+//gmxapi::session::OutputStream* ResourcesHandle::ostream()
 //{
 //    return ostream_.get();
 //}
 
-EnsembleResourceHandle EnsembleResources::getHandle() const
+ResourcesHandle Resources::getHandle() const
 {
-    auto handle = EnsembleResourceHandle();
+    auto handle = ResourcesHandle();
 
     if (!bool(reduce_))
     {
@@ -60,23 +60,23 @@ EnsembleResourceHandle EnsembleResources::getHandle() const
 
     if (!session_)
     {
-        throw gmxapi::ProtocolError("EnsembleResources::getHandle() must not be called before setSession() has been called.");
+        throw gmxapi::ProtocolError("Resources::getHandle() must not be called before setSession() has been called.");
     }
     handle.session_ = session_;
 
     return handle;
 }
 
-void EnsembleResources::setSession(gmxapi::SessionResources* session)
+void Resources::setSession(gmxapi::SessionResources* session)
 {
     if (!session)
     {
-        throw gmxapi::ProtocolError("EnsembleResources::setSession received a null SessionResources pointer.");
+        throw gmxapi::ProtocolError("Resources::setSession received a null SessionResources pointer.");
     }
     session_ = session;
 }
 //
-//void EnsembleResources::setOutputStream(std::unique_ptr<gmxapi::session::OutputStream> ostream)
+//void Resources::setOutputStream(std::unique_ptr<gmxapi::session::OutputStream> ostream)
 //{
 //    ostream_ = std::move(ostream);
 //}

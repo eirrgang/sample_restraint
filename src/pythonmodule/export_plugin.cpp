@@ -19,16 +19,18 @@
 #include "gmxapi/md/mdmodule.h"
 #include "gmxapi/gmxapi.h"
 
-#include "ensemblepotential.h"
+#include "mdstring_potential.h"
 
 // Make a convenient alias to save some typing...
 namespace py = pybind11;
 
 template<>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::getModule()
+std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential
+>>>::getModule()
 {
     return shared_from_this();
 }
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // New restraints mimicking EnsembleRestraint should specialize getModule() here as above.
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -101,7 +103,7 @@ class EnsembleRestraintBuilder
         void build(py::object graph)
         {
             // Temporarily subvert things to get quick-and-dirty solution for testing.
-            // Need to capture Python communicator and pybind syntax in closure so EnsembleResources
+            // Need to capture Python communicator and pybind syntax in closure so Resources
             // can just call with matrix arguments.
 
             // This can be replaced with a subscription and delayed until launch, if necessary.
@@ -113,8 +115,8 @@ class EnsembleRestraintBuilder
             auto update = context_.attr("ensemble_update");
             // Make a callable with standardizeable signature.
             const std::string name{name_};
-            auto functor = [update, name](const plugin::Matrix<double>& send,
-                                          plugin::Matrix<double>* receive) {
+            auto functor = [update, name](const plugin::Matrix2D<double>& send,
+                                          plugin::Matrix2D<double>* receive) {
                 update(send,
                        receive,
                        py::str(name));
@@ -122,9 +124,9 @@ class EnsembleRestraintBuilder
 
             // To use a reduce function on the Python side, we need to provide it with a Python buffer-like object,
             // so we will create one here. Note: it looks like the SharedData element will be useful after all.
-            auto resources = std::make_shared<plugin::EnsembleResources>(std::move(functor));
+            auto resources = std::make_shared<plugin::Resources>(std::move(functor));
 
-            auto potential = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>::create(name_,
+            auto potential = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential>>>::create(name_,
                                                                                                      siteIndices_,
                                                                                                      params_,
                                                                                                      resources);
@@ -195,14 +197,14 @@ std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object
 // The first argument is the name of the module when importing to Python. This should be the same as the name specified
 // as the OUTPUT_NAME for the shared object library in the CMakeLists.txt file. The second argument, 'm', can be anything
 // but it might as well be short since we use it to refer to aspects of the module we are defining.
-PYBIND11_MODULE(myplugin, m) {
-    m.doc() = "sample plugin"; // This will be the text of the module's docstring.
+PYBIND11_MODULE(mdstring, m) {
+    m.doc() = "String method for molecular dynamics"; // This will be the text of the module's docstring.
 
     // Matrix utility class (temporary). Borrowed from http://pybind11.readthedocs.io/en/master/advanced/pycpp/numpy.html#arrays
-    py::class_<plugin::Matrix<double>, std::shared_ptr<plugin::Matrix<double>>>(m,
-                                                                                "Matrix",
+    py::class_<plugin::Matrix2D<double>, std::shared_ptr<plugin::Matrix2D<double>>>(m,
+                                                                                "Matrix2D",
                                                                                 py::buffer_protocol())
-        .def_buffer([](plugin::Matrix<double>& matrix) -> py::buffer_info {
+        .def_buffer([](plugin::Matrix2D<double>& matrix) -> py::buffer_info {
             return py::buffer_info(
                 matrix.data(),                               /* Pointer to buffer */
                 sizeof(double),                          /* Size of one scalar */
@@ -225,11 +227,11 @@ PYBIND11_MODULE(myplugin, m) {
     ensembleBuilder.def("build",
                         &EnsembleRestraintBuilder::build);
 
-    // Get more concise name for the template instantiation...
-    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::EnsembleRestraint>>;
+    // Define a more concise name for the template instantiation...
+    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential>>>;
 
     // Export a Python class for our parameters struct
-    py::class_<plugin::EnsembleRestraint::input_param_type> ensembleParams(m, "EnsembleRestraintParams");
+    py::class_<plugin::Restraint<plugin::EnsemblePotential>::input_param_type> ensembleParams(m, "EnsembleRestraintParams");
     m.def("make_ensemble_params",
           &plugin::makeEnsembleParams);
 
