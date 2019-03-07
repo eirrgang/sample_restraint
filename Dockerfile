@@ -35,10 +35,10 @@ COPY --chown=1000 cmake/ /home/jovyan/sample_restraint/cmake/
 COPY --chown=1000 docs/ /home/jovyan/sample_restraint/docs/
 COPY --chown=1000 src/ /home/jovyan/sample_restraint/src/
 COPY --chown=1000 tests/ /home/jovyan/sample_restraint/tests/
-COPY --chown=1000 examples/example.ipynb /home/jovyan/sample_restraint/examples/
-COPY --chown=1000 examples/job.sh /home/jovyan/sample_restraint/examples/
-COPY --chown=1000 examples/restrained-ensemble.py /home/jovyan/sample_restraint/examples/
-COPY --chown=1000 examples/strip_notebook.py /home/jovyan/sample_restraint/examples/
+#COPY --chown=1000 examples/example.ipynb /home/jovyan/sample_restraint/examples/
+#COPY --chown=1000 examples/job.sh /home/jovyan/sample_restraint/examples/
+#COPY --chown=1000 examples/restrained-mdstring.py /home/jovyan/sample_restraint/examples/
+#COPY --chown=1000 examples/strip_notebook.py /home/jovyan/sample_restraint/examples/
 
 # Prune the directory after removed or find will try to descend into a nonexistant directory
 RUN find /home/jovyan -name __pycache__ -exec rm -rf \{\} \; -prune

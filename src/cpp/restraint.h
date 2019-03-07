@@ -17,7 +17,7 @@
 namespace plugin
 {
 /*!
- * \brief Use EnsembleHarmonic to implement a RestraintPotential
+ * \brief Use MDStringHarmonic to implement a RestraintPotential
  *
  * This is boiler plate that will be templated and moved.
  */

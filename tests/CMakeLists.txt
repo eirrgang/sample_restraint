@@ -53,18 +53,18 @@ set_tests_properties(BasicPlugin PROPERTIES
                      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
                      COMPILE_DEFINITIONS "${GMOCK_COMPILE_DEFINITIONS}"
                      COMPILE_FLAGS "${GMOCK_COMPILE_FLAGS}")
-
-# Test the C++ force evaluation for the restrained-ensemble biasing potential.
-add_executable(histogram-test test_histogram.cpp)
-add_test(EnsembleHistogramPotentialPlugin histogram-test)
-
-target_include_directories(histogram-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-
-set_target_properties(histogram-test PROPERTIES SKIP_BUILD_RPATH FALSE)
-target_link_libraries(histogram-test mdstring_potential Gromacs::gmxapi
-                      gtest_main)
-
-set_tests_properties(EnsembleHistogramPotentialPlugin PROPERTIES
-                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                     COMPILE_DEFINITIONS "${GMOCK_COMPILE_DEFINITIONS}"
-                     COMPILE_FLAGS "${GMOCK_COMPILE_FLAGS}")
+#
+## Test the C++ force evaluation for the restrained-mdstring biasing potential.
+#add_executable(histogram-test test_histogram.cpp)
+#add_test(MDStringHistogramPotentialPlugin histogram-test)
+#
+#target_include_directories(histogram-test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+#
+#set_target_properties(histogram-test PROPERTIES SKIP_BUILD_RPATH FALSE)
+#target_link_libraries(histogram-test mdstring_potential Gromacs::gmxapi
+#                      gtest_main)
+#
+#set_tests_properties(MDStringHistogramPotentialPlugin PROPERTIES
+#                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+#                     COMPILE_DEFINITIONS "${GMOCK_COMPILE_DEFINITIONS}"
+#                     COMPILE_FLAGS "${GMOCK_COMPILE_FLAGS}")

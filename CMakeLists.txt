@@ -141,9 +141,6 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 # Now move on to building the custom code.
 add_subdirectory(src)
 
-# Set up documentation build targets (work in progress).
-add_subdirectory(docs)
-
 
 # Process CMake configuration for Python and C++ tests.
 if(BUILD_TESTING)

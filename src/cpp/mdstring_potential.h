@@ -6,14 +6,14 @@
 #define HARMONICRESTRAINT_ENSEMBLEPOTENTIAL_H
 
 /*! \file
- * \brief Provide restrained ensemble MD potential for GROMACS plugin.
+ * \brief Provide restrained mdstring MD potential for GROMACS plugin.
  *
  * The restraint implemented here uses a facility provided by gmxapi to perform averaging of some
- * array data across an ensemble of simulations. Simpler pair restraints can use less of this
+ * array data across an mdstring of simulations. Simpler pair restraints can use less of this
  * example code.
  *
  * Contains a lot of boiler plate that is being generalized and migrate out of this file, but other
- * pair restraints can be implemented by following the example in this and ``ensemblepotential.cpp``.
+ * pair restraints can be implemented by following the example in this and ``mdstringpotential.cpp``.
  * The ``CMakeLists.txt`` file will need to be updated if you add additional source files, and
  * ``src/pythonmodule/export_plugin.cpp`` will need to be updated if you add or change the name of
  * potentials.
@@ -36,8 +36,10 @@ namespace plugin
 /*!
  * \brief Structure for input and state.
  */
-struct ensemble_input_param_type
+struct mdstring_data_t
 {
+    // Inputs
+
     /// distance histogram parameters
     size_t nBins{0};
     double binWidth{0.};
@@ -61,10 +63,26 @@ struct ensemble_input_param_type
     /// Smoothing factor: width of Gaussian interpolation for histogram
     double sigma{0};
 
+    // State data
+
+    /// Smoothed historic distribution for this restraint. An element of the array of restraints in this simulation.
+    std::vector<double> histogram;
+
+    unsigned int currentSample{0};
+    double nextSampleTime;
+
+    /// Accumulated list of samples during a new window.
+    std::vector<double> distanceSamples;
+
+    size_t currentWindow{0};
+    double windowStartTime{0};
+    double nextWindowUpdateTime;
+    /// The history of nwindows histograms for this restraint.
+    std::vector<plugin::Matrix2D<double>> windows{};
 };
 
-std::unique_ptr<ensemble_input_param_type>
-makeEnsembleParams(size_t nbins,
+std::unique_ptr<mdstring_data_t>
+makeMDStringParams(size_t nbins,
                    double binWidth,
                    double minDist,
                    double maxDist,
@@ -76,12 +94,12 @@ makeEnsembleParams(size_t nbins,
                    double sigma);
 
 /*!
- * \brief a residue-pair bias calculator for use in restrained-ensemble simulations.
+ * \brief a residue-pair bias calculator for use in restrained-mdstring simulations.
  *
  * Applies a force between two sites according to the difference between an experimentally observed
  * site pair distance distribution and the distance distribution observed earlier in the simulation
  * trajectory. The sampled distribution is averaged from the previous `nwindows` histograms from all
- * ensemble members. Each window contains a histogram populated with `nsamples` distances recorded at
+ * mdstring members. Each window contains a histogram populated with `nsamples` distances recorded at
  * `sample_period` step intervals.
  *
  * \internal
@@ -89,13 +107,13 @@ makeEnsembleParams(size_t nbins,
  * the difference between the sampled and experimental histograms. At the beginning of the window, this
  * difference is found and a Gaussian blur is applied.
  */
-class EnsemblePotential
+class MDStringPotential
 {
     public:
-        using input_param_type = ensemble_input_param_type;
+        using input_param_type = mdstring_data_t;
 
         /* No default constructor. Parameters must be provided. */
-//        EnsemblePotential();
+//        MDStringPotential();
 
         /*!
          * \brief Constructor called by the wrapper code to produce a new instance.
@@ -105,7 +123,7 @@ class EnsemblePotential
          *
          * \param params
          */
-        explicit EnsemblePotential(const input_param_type& params);
+        explicit MDStringPotential(const input_param_type& params);
 
         /*!
          * \brief Deprecated constructor taking a parameter list.
@@ -121,7 +139,7 @@ class EnsemblePotential
          * \param k
          * \param sigma
          */
-        EnsemblePotential(size_t nbins,
+        MDStringPotential(size_t nbins,
                           double binWidth,
                           double minDist,
                           double maxDist,
@@ -137,7 +155,7 @@ class EnsemblePotential
          *
          * In parallel simulations, the gmxapi framework does not make guarantees about where or
          * how many times this function is called. It should be simple and stateless; it should not
-         * update class member data (see ``ensemblepotential.cpp``. For a more controlled API hook
+         * update class member data (see ``mdstringpotential.cpp``. For a more controlled API hook
          * and to manage state in the object, use ``callback()``.
          *
          * \param v position of the site for which force is being calculated.
@@ -156,7 +174,7 @@ class EnsemblePotential
          * the restraint framework calls this function (on the first rank only in a parallel simulation) before calling calculate().
          *
          * The callback may use resources provided by the Session in the callback to perform updates
-         * to the local or global state of an ensemble of simulations. Future gmxapi releases will
+         * to the local or global state of an mdstring of simulations. Future gmxapi releases will
          * include additional optimizations, allowing call-back frequency to be expressed, and more
          * general Session resources, as well as more flexible call signatures.
          */
@@ -168,28 +186,13 @@ class EnsemblePotential
     private:
         /// Aggregate data structure holding object state.
         input_param_type state_;
-
-        /// Smoothed historic distribution for this restraint. An element of the array of restraints in this simulation.
-        std::vector<double> histogram_;
-
-        unsigned int currentSample_;
-        double nextSampleTime_;
-
-        /// Accumulated list of samples during a new window.
-        std::vector<double> distanceSamples_;
-
-        size_t currentWindow_;
-        double windowStartTime_;
-        double nextWindowUpdateTime_;
-        /// The history of nwindows histograms for this restraint.
-        std::vector<std::unique_ptr<plugin::Matrix2D<double>>> windows_;
 };
 
 
 // Important: Just declare the template instantiation here for client code.
 // We will explicitly instantiate a definition in the .cpp file where the input_param_type is defined.
 extern template
-class RestraintModule<Restraint<EnsemblePotential>>;
+class RestraintModule<Restraint<MDStringPotential>>;
 
 } // end namespace plugin
 

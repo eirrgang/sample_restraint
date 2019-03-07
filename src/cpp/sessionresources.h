@@ -55,13 +55,22 @@ class Matrix2D
         size_t cols() const
         { return cols_; }
 
+        void swap(Matrix2D<T>& other) noexcept
+        {
+            if (&other != this)
+            {
+                std::swap(data_, other.data_);
+                std::swap(rows_, other.rows_);
+                std::swap(cols_, other.cols_);
+            }
+        }
     private:
         size_t rows_;
         size_t cols_;
         std::vector<T> data_;
 };
 
-// Defer implicit instantiation to ensemblepotential.cpp
+// Defer implicit instantiation to mdstring_potential.cpp
 extern template
 class Matrix2D<double>;
 
@@ -121,7 +130,7 @@ class ResourcesHandle
          */
         void stop();
 
-        // to be abstracted and hidden...
+        // TODO: to be abstracted and hidden...
         const std::function<void(const Matrix2D<double>&,
                                  Matrix2D<double>*)>* reduce_;
 

@@ -1,30 +1,5 @@
-Sample MD restraint plugin
+MDString restraint plugin
 ==========================
-
-[![image](https://travis-ci.org/kassonlab/sample_restraint.svg?branch=master)](https://travis-ci.org/kassonlab/sample_restraint)
-
-This [repository](https://github.com/kassonlab/sample_restraint)
-provides a complete and working implementation of a few GROMACS
-restraint potentials. It is intended as both a tutorial and as a
-template for implementing new custom restraint potentials.
-
-Restraint potentials are implemented as \"plugins\" to GROMACS. The
-required GROMACS modifications are available at this [GitHub
-repository](https://github.com/kassonlab/gromacs-gmxapi)
-
-The plugin potentials are loaded and configured via Python and are
-compatible with the [gmxapi](https://github.com/kassonlab/gmxapi) Python
-package for MD simulation workflows.
-
-For a quick start, consider pulling a recent Docker image that has
-already been configured for gmxapi and this plug-in.
-
-Reference:
-
-Irrgang, M. E., Hays, J. M., & Kasson, P. M. gmxapi: a high-level
-interface for advanced control and extension of molecular dynamics
-simulations. *Bioinformatics* 2018. DOI:
-[10.1093/bioinformatics/bty484](https://doi.org/10.1093/bioinformatics/bty484)
 
 Repository Contents
 -------------------
@@ -41,11 +16,8 @@ package.
     existing potentials as examples.
 -   `src/pythonmodule/` contains `CMakeLists.txt`, `export_plugin.h`,
     and `export_plugin.cpp`. When you have written a new potential, you
-    can add it to `CMakeLists.txt` and `export_plugin.cpp`. This is the
-    code that produces the C++ extension for Python. `HarmonicRestraint`
-    is a simple example that applies a Hooke\'s Law spring between two
-    atoms. `EnsemblePotential` applies a more complicated potential and
-    uses additional facilities provided by gmxapi.
+    can add it to `CMakeLists.txt` and `export_plugin.cpp`. 
+    `MDStringPotential` uses additional facilities provided by gmxapi.
 -   `src/pybind11` is just a copy of the Python bindings framework from
     the Pybind project (ref <https://github.com/pybind/pybind11> ). It
     is used to wrap the C++ restraint code and give it a Python
@@ -56,56 +28,11 @@ package.
     tests use the [pytest](https://docs.pytest.org/en/latest/). Refer to
     those respective projects for more about how they make test-writing
     easier.
--   `examples` contains a sample SLURM job script and
-    `restrained-ensemble.py` gmxapi script that have been used to do
-    restrained ensemble simulations. `example.py` and `example.ipynb`
-    explore a toy alanine dipeptide system. `strip_notebook.py` is a
-    helper script to remove extra output and state data from an iPython
-    notebook before checking updates back into the repository.
 -   `Dockerfile` is a recipe to build a Docker image from the root of
     the repository.
 
-Docker quick-start
-------------------
-
-Pull the docker image and launch a container with port 8888 on the host
-mapped to port 8888 in the container. :
-
-    docker run --rm -ti -p 8888:8888 gmxapi/sample_restraint:devel
-
-Note that the `--rm` option tells docker not to save any changes you
-make after launching the container. You can, however, download any
-changes you make to the notebook through the web interface. Refer to the
-[Docker documentation](https://docs.docker.com) for more options on
-managing containers.
-
-You should then see something like the following, but with a different
-`token` for the URL. Open the URL in a browser on the same (host)
-machine to access the notebook server. Browse to `sample_restraint` and
-`examples` and then launch the `example` notebook for an interactive
-walk-through. Example output:
-
-    Execute the command: jupyter notebook
-    [I 15:26:07.683 NotebookApp] Writing notebook server cookie secret to /home/jovyan/.local/share/jupyter/runtime/notebook_cookie_secret
-    [W 15:26:08.184 NotebookApp] WARNING: The notebook server is listening on all IP addresses and not using encryption. This is not recommended.
-    [I 15:26:08.223 NotebookApp] JupyterLab alpha preview extension loaded from /opt/conda/lib/python3.6/site-packages/jupyterlab
-    [I 15:26:08.230 NotebookApp] Serving notebooks from local directory: /home/jovyan
-    [I 15:26:08.230 NotebookApp] 0 active kernels
-    [I 15:26:08.230 NotebookApp] The Jupyter Notebook is running at:
-    [I 15:26:08.230 NotebookApp] http://[all ip addresses on your system]:8888/?token=948d611453ea3f03ad406dc375bfc186c4315fa68c50e23d
-    [I 15:26:08.230 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
-    [C 15:26:08.231 NotebookApp]
-
-        Copy/paste this URL into your browser when you connect for the first time,
-        to login with a token:
-            http://localhost:8888/?token=948d611453ea3f03ad406dc375bfc186c4315fa68c50e23d
-
 The basics
 ----------
-
-This repository provides a potentially useful plugin, but also serves as
-documentation by example and as a template for developing GROMACS
-extension code in the gmxapi framework.
 
 ### Build and install
 
@@ -189,15 +116,6 @@ instance, while still in the build directory:
 The Python module `gmx` is required for testing. See
 [gmxapi](https://github.com/kassonlab/gmxapi)
 
-### Running
-
-The `examples` directory contains some sample scripts for running
-`gmxapi` workflows using the restraint potential samples in this
-repository. You may also find `tests/test_binding.py` informative.
-
-For a basic walk-through with a toy system, launch a Jupyter notebook
-server and navigate to `examples/example.py`
-
 ### What\'s going on
 
 This sample project builds several C++ libraries with names such as
@@ -230,18 +148,6 @@ from the Python interpreter. Pybind11 syntax in `export_plugin.cpp`
 provides the code to actually expose the plugin as a class in a Python
 module that is compatible with the `gmx` package provided in the
 `gmxapi` project.
-
-By version 0.1.0, additional wrappers and boilerplate code will be
-migrated out of the files that define the `calculate()` methods. Until
-then, some amount of copy-and-paste or editing is necessary to implement
-a new potential. Refer to `src/cpp/harmonicpotential.h` and to
-`src/cpp/harmonicpotential.cpp` for a documented example of a simple
-pair restraint. A more complex example is found in the
-`ensemblepotential` files. The code in `src/cpp` is sufficient to
-produce testable object code, but the Python module is exported in
-`src/pythonmodule/export_plugin.cpp`. If you add additional source files
-for a new potential, you will need to update `src/cpp/CMakeLists.txt` as
-well.
 
 Python tests
 ------------

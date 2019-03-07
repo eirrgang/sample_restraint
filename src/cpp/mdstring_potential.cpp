@@ -1,11 +1,5 @@
 /*! \file
- * \brief Code to implement the potential declared in ensemblepotential.h
- *
- * This file currently contains boilerplate that will not be necessary in future gmxapi releases, as
- * well as additional code used in implementing the restrained ensemble example workflow.
- *
- * A simpler restraint potential would only update the calculate() function. If a callback function is
- * not needed or desired, remove the callback() code from this file and from ensemblepotential.h
+ * \brief Code to implement the potential declared in mdstring_potential.h
  *
  * \author M. Eric Irrgang <ericirrgang@gmail.com>
  */
@@ -37,7 +31,7 @@ class BlurToGrid
 {
     public:
         /*!
-         * \brief Contsruct the blurring functor.
+         * \brief Construct the blurring functor.
          *
          * \param low The coordinate value of the first grid point.
          * \param gridSpacing Distance between grid points.
@@ -109,7 +103,7 @@ class BlurToGrid
         const double sigma_;
 };
 
-EnsemblePotential::EnsemblePotential(size_t nbins,
+MDStringPotential::MDStringPotential(size_t nbins,
                                      double binWidth,
                                      double minDist,
                                      double maxDist,
@@ -119,20 +113,15 @@ EnsemblePotential::EnsemblePotential(size_t nbins,
                                      unsigned int nWindows,
                                      double k,
                                      double sigma) :
-    state_{nbins, binWidth, minDist, maxDist, experimental, nSamples, samplePeriod, nWindows, k, sigma},
-    histogram_(nbins,
-               0),
-    currentSample_{0},
-    // In actuality, we have nsamples at (samplePeriod - dt), but we don't have access to dt.
-    nextSampleTime_{samplePeriod},
-    currentWindow_{0},
-    windowStartTime_{0},
-    nextWindowUpdateTime_{nSamples * samplePeriod},
-    windows_{}
-{}
+    state_{nbins, binWidth, minDist, maxDist, experimental, nSamples, samplePeriod, nWindows, k, sigma}
+{
+    state_.histogram = std::move(std::vector<double>(nbins, 0.));
+    state_.nextSampleTime = state_.samplePeriod;
+    state_.nextWindowUpdateTime = state_.nSamples * state_.samplePeriod;
+}
 
-EnsemblePotential::EnsemblePotential(const input_param_type& params) :
-    EnsemblePotential(params.nBins,
+MDStringPotential::MDStringPotential(const input_param_type& params) :
+    MDStringPotential(params.nBins,
                      params.binWidth,
                      params.minDist,
                      params.maxDist,
@@ -152,7 +141,7 @@ EnsemblePotential::EnsemblePotential(const input_param_type& params) :
 // a parallelized simulation).
 //
 //
-void EnsemblePotential::callback(gmx::Vector v,
+void MDStringPotential::callback(gmx::Vector v,
                                 gmx::Vector v0,
                                 double t,
                                 const Resources& resources)
@@ -163,90 +152,45 @@ void EnsemblePotential::callback(gmx::Vector v,
     const auto R = sqrt(Rsquared);
 
     // Store historical data every sample_period steps
-    if (t >= nextSampleTime_)
+    if (t >= state_.nextSampleTime)
     {
-        distanceSamples_[currentSample_++] = R;
-        nextSampleTime_ = (currentSample_ + 1) * state_.samplePeriod + windowStartTime_;
+        state_.distanceSamples[state_.currentSample++] = R;
+        state_.nextSampleTime = (state_.currentSample + 1) * state_.samplePeriod + state_.windowStartTime;
     };
 
     // Every nsteps:
-    //   0. Drop oldest window
-    //   1. Reduce historical data for this restraint in this simulation.
-    //   2. Call out to the global reduction for this window.
-    //   3. On update, checkpoint the historical data source.
-    //   4. Update historic windows.
-    //   5. Use handles retained from previous windows to reconstruct the smoothed working histogram
-    if (t >= nextWindowUpdateTime_)
+    if (t >= state_.nextWindowUpdateTime)
     {
-        // Get next histogram array, recycling old one if available.
-        std::unique_ptr<Matrix2D<double>> new_window = std::make_unique<Matrix2D<double>>(1,
-                                                                                              state_.nBins);
-        std::unique_ptr<Matrix2D<double>> temp_window;
-        if (windows_.size() == state_.nWindows)
-        {
-            // Recycle the oldest window.
-            // \todo wrap this in a helper class that manages a buffer we can shuffle through.
-            windows_[0].swap(temp_window);
-            windows_.erase(windows_.begin());
-        }
-        else
-        {
-            auto new_temp_window = std::make_unique<Matrix2D<double>>(1, state_.nBins);
-            assert(new_temp_window);
-            temp_window.swap(new_temp_window);
-        }
-
         // Reduce sampled data for this restraint in this simulation, applying a Gaussian blur to fill a grid.
         auto blur = BlurToGrid(0.0,
                                state_.binWidth,
                                state_.sigma);
-        assert(new_window != nullptr);
-        assert(distanceSamples_.size() == state_.nSamples);
-        assert(currentSample_ == state_.nSamples);
-        blur(distanceSamples_,
-             new_window->vector());
+        assert(state_.distanceSamples.size() == state_.nSamples);
+        assert(state_.currentSample == state_.nSamples);
+//        blur(state_.distanceSamples,
+//             new_window.vector());
         // We can just do the blur locally since there aren't many bins. Bundling these operations for
         // all restraints could give us a chance at some parallelism. We should at least use some
         // threading if we can.
 
         // We request a handle each time before using resources to make error handling easier if there is a failure in
-        // one of the ensemble member processes and to give more freedom to how resources are managed from step to step.
+        // one of the mdstring member processes and to give more freedom to how resources are managed from step to step.
         auto ensemble = resources.getHandle();
         // Get global reduction (sum) and checkpoint.
-        assert(temp_window != nullptr);
-        // Todo: in reduce function, give us a mean instead of a sum.
-        ensemble.reduce(*new_window,
-                        temp_window.get());
-
-        // Update window list with smoothed data.
-        windows_.emplace_back(std::move(new_window));
-
-        // Get new histogram difference. Subtract the experimental distribution to get the values to use in our potential.
-        for (auto& bin : histogram_)
-        {
-            bin = 0;
-        }
-        for (const auto& window : windows_)
-        {
-            for (size_t i = 0;i < window->cols();++i)
-            {
-                histogram_.at(i) += (window->vector()->at(i) - state_.experimental.at(i)) / windows_.size();
-            }
-        }
-
+//        ensemble.reduce(send_buffer,
+//                        receive_buffer);
 
         // Note we do not have the integer timestep available here. Therefore, we can't guarantee that updates occur
         // with the same number of MD steps in each interval, and the interval will effectively lose digits as the
         // simulation progresses, so _update_period should be cleanly representable in binary. When we extract this
         // to a facility, we can look for a part of the code with access to the current timestep.
-        windowStartTime_ = t;
-        nextWindowUpdateTime_ = state_.nSamples * state_.samplePeriod + windowStartTime_;
-        ++currentWindow_; // This is currently never used. I'm not sure it will be, either...
+        state_.windowStartTime = t;
+        state_.nextWindowUpdateTime = state_.nSamples * state_.samplePeriod + state_.windowStartTime;
 
         // Reset sample bufering.
-        currentSample_ = 0;
+        state_.currentSample = 0;
         // Reset sample times.
-        nextSampleTime_ = t + state_.samplePeriod;
+        state_.nextSampleTime = t + state_.samplePeriod;
     };
 
 }
@@ -257,7 +201,7 @@ void EnsemblePotential::callback(gmx::Vector v,
 // HERE is the function that does the calculation of the restraint force.
 //
 //
-gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
+gmx::PotentialPointData MDStringPotential::calculate(gmx::Vector v,
                                                     gmx::Vector v0,
                                                     double t)
 {
@@ -279,31 +223,18 @@ gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
 
         double f{0};
 
-        if (R > state_.maxDist)
-        {
-            // apply a force to reduce R
-            f = state_.k * (state_.maxDist - R);
-        }
-        else if (R < state_.minDist)
-        {
-            // apply a force to increase R
-            f = state_.k * (state_.minDist - R);
-        }
-        else
-        {
-            double f_scal{0};
+        double f_scal{0};
 
-            const size_t numBins = histogram_.size();
-            double normConst = sqrt(2 * M_PI) * state_.sigma * state_.sigma * state_.sigma;
+        const size_t numBins = state_.histogram.size();
+        double normConst = sqrt(2 * M_PI) * state_.sigma * state_.sigma * state_.sigma;
 
-            for (size_t n = 0;n < numBins;n++)
-            {
-                const double x{n * state_.binWidth - R};
-                const double argExp{-0.5 * x * x / (state_.sigma * state_.sigma)};
-                f_scal += histogram_.at(n) * exp(argExp) * x / normConst;
-            }
-            f = -state_.k * f_scal;
+        for (size_t n = 0;n < numBins;n++)
+        {
+            const double x{n * state_.binWidth - R};
+            const double argExp{-0.5 * x * x / (state_.sigma * state_.sigma)};
+            f_scal += state_.histogram.at(n) * exp(argExp) * x / normConst;
         }
+        f = -state_.k * f_scal;
 
         const auto magnitude = f / norm(rdiff);
         output.force = rdiff * static_cast<decltype(rdiff[0])>(magnitude);
@@ -311,8 +242,8 @@ gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
     return output;
 }
 
-std::unique_ptr<ensemble_input_param_type>
-makeEnsembleParams(size_t nbins,
+std::unique_ptr<mdstring_data_t>
+makeMDStringParams(size_t nbins,
                    double binWidth,
                    double minDist,
                    double maxDist,
@@ -324,7 +255,7 @@ makeEnsembleParams(size_t nbins,
                    double sigma)
 {
     using std::make_unique;
-    auto params = make_unique<ensemble_input_param_type>();
+    auto params = make_unique<mdstring_data_t>();
     params->nBins = nbins;
     params->binWidth = binWidth;
     params->minDist = minDist;
@@ -339,9 +270,9 @@ makeEnsembleParams(size_t nbins,
     return params;
 };
 
-// Important: Explicitly instantiate a definition for the templated class declared in ensemblepotential.h.
+// Important: Explicitly instantiate a definition for the templated class declared in mdstringpotential.h.
 // Failing to do this will cause a linker error.
 template
-class ::plugin::RestraintModule<Restraint<EnsemblePotential>>;
+class ::plugin::RestraintModule<Restraint<MDStringPotential>>;
 
 } // end namespace plugin

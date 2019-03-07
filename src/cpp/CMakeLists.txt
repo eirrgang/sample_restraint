@@ -1,7 +1,7 @@
 # Defines targets for the C++ restraints implemented here. These CMake targets are used by the
 # unit tests and by the Python module target defined in ../pythonmodule/CMakeLists.txt
 
-# Create a shared object library for our restrained ensemble plugin.
+# Create a shared object library for our mdstring plugin.
 add_library(mdstring_potential STATIC
             mdstring_potential.h
             mdstring_potential.cpp

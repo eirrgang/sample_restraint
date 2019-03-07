@@ -2,7 +2,7 @@
  * \brief Provide Python bindings and helper functions for setting up restraint potentials.
  *
  * There is currently a lot of boilerplate here that will be generalized and removed in a future version.
- * In the mean time, follow the example for EnsembleRestraint to create the proper helper functions
+ * In the mean time, follow the example for MDStringRestraint to create the proper helper functions
  * and instantiate the necessary templates.
  *
  * \author M. Eric Irrgang <ericirrgang@gmail.com>
@@ -25,20 +25,20 @@
 namespace py = pybind11;
 
 template<>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential
+std::shared_ptr<gmxapi::MDModule> PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::MDStringPotential
 >>>::getModule()
 {
     return shared_from_this();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// New restraints mimicking EnsembleRestraint should specialize getModule() here as above.
+// New restraints mimicking MDStringRestraint should specialize getModule() here as above.
 //////////////////////////////////////////////////////////////////////////////////////////
 
-class EnsembleRestraintBuilder
+class MDStringRestraintBuilder
 {
     public:
-        explicit EnsembleRestraintBuilder(py::object element)
+        explicit MDStringRestraintBuilder(py::object element)
         {
             name_ = py::cast<std::string>(element.attr("name"));
             assert(!name_.empty());
@@ -70,7 +70,7 @@ class EnsembleRestraintBuilder
             auto k = pybind11::cast<double>(parameter_dict["k"]);
             auto sigma = pybind11::cast<double>(parameter_dict["sigma"]);
 
-            auto params = plugin::makeEnsembleParams(nbins,
+            auto params = plugin::makeMDStringParams(nbins,
                                                      binWidth,
                                                      minDist,
                                                      maxDist,
@@ -107,12 +107,12 @@ class EnsembleRestraintBuilder
             // can just call with matrix arguments.
 
             // This can be replaced with a subscription and delayed until launch, if necessary.
-            if (!py::hasattr(context_, "ensemble_update"))
+            if (!py::hasattr(context_, "mdstring_update"))
             {
-                throw gmxapi::ProtocolError("context does not have 'ensemble_update'.");
+                throw gmxapi::ProtocolError("context does not have 'mdstring_update'.");
             }
             // make a local copy of the Python object so we can capture it in the lambda
-            auto update = context_.attr("ensemble_update");
+            auto update = context_.attr("mdstring_update");
             // Make a callable with standardizeable signature.
             const std::string name{name_};
             auto functor = [update, name](const plugin::Matrix2D<double>& send,
@@ -126,7 +126,7 @@ class EnsembleRestraintBuilder
             // so we will create one here. Note: it looks like the SharedData element will be useful after all.
             auto resources = std::make_shared<plugin::Resources>(std::move(functor));
 
-            auto potential = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential>>>::create(name_,
+            auto potential = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::MDStringPotential>>>::create(name_,
                                                                                                      siteIndices_,
                                                                                                      params_,
                                                                                                      resources);
@@ -156,7 +156,7 @@ class EnsembleRestraintBuilder
         py::object context_;
         std::vector<int> siteIndices_;
 
-        plugin::ensemble_input_param_type params_;
+        plugin::mdstring_data_t params_;
 
         std::string name_;
 };
@@ -167,16 +167,16 @@ class EnsembleRestraintBuilder
  * \param element WorkElement provided through Context
  * \return ownership of new builder object
  */
-std::unique_ptr<EnsembleRestraintBuilder> createEnsembleBuilder(const py::object element)
+std::unique_ptr<MDStringRestraintBuilder> createMDStringBuilder(const py::object element)
 {
     using std::make_unique;
-    auto builder = make_unique<EnsembleRestraintBuilder>(element);
+    auto builder = make_unique<MDStringRestraintBuilder>(element);
     return builder;
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-// New potentials modeled after EnsembleRestraint should define a Builder class and define a
+// New potentials modeled after MDStringRestraint should define a Builder class and define a
 // factory function here, following the previous two examples. The factory function should be
 // exposed to Python following the examples near the end of the PYBIND11_MODULE block.
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -217,29 +217,29 @@ PYBIND11_MODULE(mdstring, m) {
         });
 
     //////////////////////////////////////////////////////////////////////////
-    // Begin EnsembleRestraint
+    // Begin MDStringRestraint
     //
-    // Define Builder to be returned from ensemble_restraint Python function defined further down.
-    pybind11::class_<EnsembleRestraintBuilder> ensembleBuilder(m,
-                                                               "EnsembleBuilder");
-    ensembleBuilder.def("add_subscriber",
-                        &EnsembleRestraintBuilder::addSubscriber);
-    ensembleBuilder.def("build",
-                        &EnsembleRestraintBuilder::build);
+    // Define Builder to be returned from mdstring_restraint Python function defined further down.
+    pybind11::class_<MDStringRestraintBuilder> mdstringBuilder(m,
+                                                               "MDStringBuilder");
+    mdstringBuilder.def("add_subscriber",
+                        &MDStringRestraintBuilder::addSubscriber);
+    mdstringBuilder.def("build",
+                        &MDStringRestraintBuilder::build);
 
     // Define a more concise name for the template instantiation...
-    using PyEnsemble = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::EnsemblePotential>>>;
+    using PyMDString = PyRestraint<plugin::RestraintModule<plugin::Restraint<plugin::MDStringPotential>>>;
 
     // Export a Python class for our parameters struct
-    py::class_<plugin::Restraint<plugin::EnsemblePotential>::input_param_type> ensembleParams(m, "EnsembleRestraintParams");
-    m.def("make_ensemble_params",
-          &plugin::makeEnsembleParams);
+    py::class_<plugin::Restraint<plugin::MDStringPotential>::input_param_type> mdstringParams(m, "MDStringRestraintParams");
+    m.def("make_mdstring_params",
+          &plugin::makeMDStringParams);
 
     // API object to build.
-    py::class_<PyEnsemble, std::shared_ptr<PyEnsemble>> ensemble(m, "EnsembleRestraint");
-    // EnsembleRestraint can only be created via builder for now.
-    ensemble.def("bind",
-                 &PyEnsemble::bind,
+    py::class_<PyMDString, std::shared_ptr<PyMDString>> mdstring(m, "MDStringRestraint");
+    // MDStringRestraint can only be created via builder for now.
+    mdstring.def("bind",
+                 &PyMDString::bind,
                  "Implement binding protocol");
     /*
      * To implement gmxapi_workspec_1_0, the module needs a function that a Context can import that
@@ -250,11 +250,11 @@ PYBIND11_MODULE(mdstring, m) {
      */
 
     // Generate the name operation that will be used to specify elements of Work in gmxapi workflows.
-    // WorkElements will then have namespace: "myplugin" and operation: "ensemble_restraint"
-    m.def("ensemble_restraint",
-          [](const py::object element) { return createEnsembleBuilder(element); });
+    // WorkElements will then have namespace: "myplugin" and operation: "mdstring_restraint"
+    m.def("mdstring_restraint",
+          [](const py::object element) { return createMDStringBuilder(element); });
     //
-    // End EnsembleRestraint
+    // End MDStringRestraint
     ///////////////////////////////////////////////////////////////////////////
 
 

@@ -103,7 +103,7 @@ void PyRestraint<T>::bind(py::object object)
  * \brief Interact with the restraint framework and gmxapi when launching a simulation.
  *
  * This should be generalized and removed from here. Unfortunately, some things need to be
- * standardized first. If a potential follows the example of EnsembleRestraint or HarmonicRestraint,
+ * standardized first. If a potential follows the example of MDStringRestraint,
  * the template specializations below can be mimicked to give GROMACS access to the potential.
  *
  * \tparam T class implementing the gmxapi::MDModule interface.

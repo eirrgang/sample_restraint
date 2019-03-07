@@ -119,8 +119,8 @@ SOL         4055
         session.run()
 
 @pytest.mark.usefixtures("cleandir")
-def test_ensemble_potential_nompi():
-    """Test ensemble potential without an ensemble.
+def test_mdstring_potential_nompi():
+    """Test mdstring potential without an mdstring.
 
     Still requires ParallelArrayContext.
     """
@@ -189,12 +189,12 @@ SOL         4055
               'k': 10000.,
               'sigma': 1.}
     potential = gmx.workflow.WorkElement(namespace="myplugin",
-                                         operation="ensemble_restraint",
+                                         operation="mdstring_restraint",
                                          params=params)
     # Note that we could flexibly capture accessor methods as workflow elements, too. Maybe we can
     # hide the extra Python bindings by letting myplugin.HarmonicRestraint automatically convert
     # to a WorkElement when add_dependency is called on it.
-    potential.name = "ensemble_restraint"
+    potential.name = "mdstring_restraint"
     md.add_dependency(potential)
 
     context = gmx.context.ParallelArrayContext(md)
@@ -205,7 +205,7 @@ SOL         4055
 
 @withmpi_only
 @pytest.mark.usefixtures("cleandir")
-def test_ensemble_potential_withmpi():
+def test_mdstring_potential_withmpi():
     import gmx
     import os
     import shutil
@@ -283,12 +283,12 @@ SOL         4055
               'sigma': 1.}
 
     potential = gmx.workflow.WorkElement(namespace="myplugin",
-                                         operation="ensemble_restraint",
+                                         operation="mdstring_restraint",
                                          params=params)
     # Note that we could flexibly capture accessor methods as workflow elements, too. Maybe we can
     # hide the extra Python bindings by letting myplugin.HarmonicRestraint automatically convert
     # to a WorkElement when add_dependency is called on it.
-    potential.name = "ensemble_restraint"
+    potential.name = "mdstring_restraint"
     before = md.workspec.elements[md.name]
     md.add_dependency(potential)
 
