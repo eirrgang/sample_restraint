@@ -37,7 +37,7 @@ class BlurToGrid
 {
     public:
         /*!
-         * \brief Contsruct the blurring functor.
+         * \brief Construct the blurring functor.
          *
          * \param low The coordinate value of the first grid point.
          * \param gridSpacing Distance between grid points.
@@ -118,15 +118,7 @@ EnsemblePotential::EnsemblePotential(size_t nbins,
                                      double samplePeriod,
                                      unsigned int nWindows,
                                      double k,
-                                     double sigma) :
-    histogram_(nbins, 0),
-    currentSample_{0},
-    // In actuality, we have nsamples at (samplePeriod - dt), but we don't have access to dt.
-    nextSampleTime_{samplePeriod},
-    currentWindow_{0},
-    windowStartTime_{0},
-    nextWindowUpdateTime_{nSamples * samplePeriod},
-    windows_{}
+                                     double sigma)
 {
     state_.nBins = nbins;
     state_.binWidth = binWidth;
@@ -138,6 +130,9 @@ EnsemblePotential::EnsemblePotential(size_t nbins,
     state_.nWindows = nWindows;
     state_.k = k;
     state_.sigma = sigma;
+    state_.histogram = std::move(std::vector<double>(nbins, 0.));
+    state_.nextSampleTime = state_.samplePeriod;
+    state_.nextWindowUpdateTime = state_.nSamples * state_.samplePeriod;
 }
 
 EnsemblePotential::EnsemblePotential(const input_param_type& params) :
@@ -172,10 +167,10 @@ void EnsemblePotential::callback(gmx::Vector v,
     const auto R = sqrt(Rsquared);
 
     // Store historical data every sample_period steps
-    if (t >= nextSampleTime_)
+    if (t >= state_.nextSampleTime)
     {
-        distanceSamples_[currentSample_++] = R;
-        nextSampleTime_ = (currentSample_ + 1) * state_.samplePeriod + windowStartTime_;
+        state_.distanceSamples[state_.currentSample++] = R;
+        state_.nextSampleTime = (state_.currentSample + 1) * state_.samplePeriod + state_.windowStartTime;
     };
 
     // Every nsteps:
@@ -185,24 +180,21 @@ void EnsemblePotential::callback(gmx::Vector v,
     //   3. On update, checkpoint the historical data source.
     //   4. Update historic windows.
     //   5. Use handles retained from previous windows to reconstruct the smoothed working histogram
-    if (t >= nextWindowUpdateTime_)
+    if (t >= state_.nextWindowUpdateTime)
     {
         // Get next histogram array, recycling old one if available.
-        std::unique_ptr<Matrix<double>> new_window = std::make_unique<Matrix<double>>(1,
-                                                                                      state_.nBins);
-        std::unique_ptr<Matrix<double>> temp_window;
-        if (windows_.size() == state_.nWindows)
+        Matrix<double> new_window = Matrix<double>(1, state_.nBins);
+        Matrix<double> temp_window(1, state_.nBins);
+        if (state_.windows.size() == state_.nWindows)
         {
             // Recycle the oldest window.
             // \todo wrap this in a helper class that manages a buffer we can shuffle through.
-            windows_[0].swap(temp_window);
-            windows_.erase(windows_.begin());
+            state_.windows[0].swap(temp_window);
+            state_.windows.erase(state_.windows.begin());
         }
         else
         {
-            auto new_temp_window = std::make_unique<Matrix<double>>(1,
-                                                                            nBins_);
-            assert(new_temp_window);
+            auto new_temp_window = Matrix<double>(1, state_.nBins);
             temp_window.swap(new_temp_window);
         }
 
@@ -210,11 +202,11 @@ void EnsemblePotential::callback(gmx::Vector v,
         auto blur = BlurToGrid(0.0,
                                state_.binWidth,
                                state_.sigma);
-        assert(new_window != nullptr);
-        assert(distanceSamples_.size() == state_.nSamples);
-        assert(currentSample_ == state_.nSamples);
-        blur(distanceSamples_,
-             new_window->vector());
+        assert(new_window.data() != nullptr);
+        assert(state_.distanceSamples.size() == state_.nSamples);
+        assert(state_.currentSample == state_.nSamples);
+        blur(state_.distanceSamples,
+             new_window.vector());
         // We can just do the blur locally since there aren't many bins. Bundling these operations for
         // all restraints could give us a chance at some parallelism. We should at least use some
         // threading if we can.
@@ -223,24 +215,24 @@ void EnsemblePotential::callback(gmx::Vector v,
         // one of the ensemble member processes and to give more freedom to how resources are managed from step to step.
         auto ensemble = resources.getHandle();
         // Get global reduction (sum) and checkpoint.
-        assert(temp_window != nullptr);
+        assert(temp_window.data() != nullptr);
         // Todo: in reduce function, give us a mean instead of a sum.
-        ensemble.reduce(*new_window,
-                        temp_window.get());
+        ensemble.reduce(new_window,
+                        &temp_window);
 
         // Update window list with smoothed data.
-        windows_.emplace_back(std::move(new_window));
+        state_.windows.emplace_back(std::move(new_window));
 
         // Get new histogram difference. Subtract the experimental distribution to get the values to use in our potential.
-        for (auto& bin : histogram_)
+        for (auto& bin : state_.histogram)
         {
             bin = 0;
         }
-        for (const auto& window : windows_)
+        for (const auto& window : state_.windows)
         {
-            for (size_t i = 0;i < window->cols();++i)
+            for (size_t i = 0;i < window.cols();++i)
             {
-                histogram_.at(i) += (window->vector()->at(i) - state_.experimental.at(i)) / windows_.size();
+                state_.histogram.at(i) += (window.data()[i] - state_.experimental.at(i)) / state_.windows.size();
             }
         }
 
@@ -249,14 +241,14 @@ void EnsemblePotential::callback(gmx::Vector v,
         // with the same number of MD steps in each interval, and the interval will effectively lose digits as the
         // simulation progresses, so _update_period should be cleanly representable in binary. When we extract this
         // to a facility, we can look for a part of the code with access to the current timestep.
-        windowStartTime_ = t;
-        nextWindowUpdateTime_ = state_.nSamples * state_.samplePeriod + windowStartTime_;
-        ++currentWindow_; // This is currently never used. I'm not sure it will be, either...
+        state_.windowStartTime = t;
+        state_.nextWindowUpdateTime = state_.nSamples * state_.samplePeriod + state_.windowStartTime;
+        ++state_.currentWindow; // This is currently never used. I'm not sure it will be, either...
 
         // Reset sample bufering.
-        currentSample_ = 0;
+        state_.currentSample = 0;
         // Reset sample times.
-        nextSampleTime_ = t + state_.samplePeriod;
+        state_.nextSampleTime = t + state_.samplePeriod;
     };
 
 }
@@ -303,14 +295,14 @@ gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
         {
             double f_scal{0};
 
-            const size_t numBins = histogram_.size();
+            const size_t numBins = state_.histogram.size();
             double normConst = sqrt(2 * M_PI) * state_.sigma * state_.sigma * state_.sigma;
 
             for (size_t n = 0;n < numBins;n++)
             {
                 const double x{n * state_.binWidth - R};
                 const double argExp{-0.5 * x * x / (state_.sigma * state_.sigma)};
-                f_scal += histogram_.at(n) * exp(argExp) * x / normConst;
+                f_scal += state_.histogram.at(n) * exp(argExp) * x / normConst;
             }
             f = -state_.k * f_scal;
         }

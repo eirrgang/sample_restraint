@@ -37,6 +37,8 @@ namespace plugin
  */
 struct ensemble_input_param_type
 {
+    // Inputs
+
     /// distance histogram parameters
     size_t nBins{0};
     double binWidth{0.};
@@ -60,6 +62,22 @@ struct ensemble_input_param_type
     /// Smoothing factor: width of Gaussian interpolation for histogram
     double sigma{0};
 
+    // State data
+
+    /// Smoothed historic distribution for this restraint. An element of the array of restraints in this simulation.
+    std::vector<double> histogram;
+
+    unsigned int currentSample{0};
+    double nextSampleTime;
+
+    /// Accumulated list of samples during a new window.
+    std::vector<double> distanceSamples;
+
+    size_t currentWindow{0};
+    double windowStartTime{0};
+    double nextWindowUpdateTime;
+    /// The history of nwindows histograms for this restraint.
+    std::vector<plugin::Matrix<double>> windows{};
 };
 
 std::unique_ptr<ensemble_input_param_type>
@@ -167,21 +185,6 @@ class EnsemblePotential
     private:
         /// Aggregate data structure holding object state.
         input_param_type state_;
-
-        /// Smoothed historic distribution for this restraint. An element of the array of restraints in this simulation.
-        std::vector<double> histogram_;
-
-        unsigned int currentSample_;
-        double nextSampleTime_;
-
-        /// Accumulated list of samples during a new window.
-        std::vector<double> distanceSamples_;
-
-        size_t currentWindow_;
-        double windowStartTime_;
-        double nextWindowUpdateTime_;
-        /// The history of nwindows histograms for this restraint.
-        std::vector<std::unique_ptr<plugin::Matrix<double>>> windows_;
 };
 
 

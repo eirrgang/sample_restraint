@@ -49,12 +49,24 @@ class Matrix
         T* data()
         { return data_.data(); };
 
+        const T* data() const
+        { return data_.data(); };
+
         size_t rows() const
         { return rows_; }
 
         size_t cols() const
         { return cols_; }
 
+        void swap(Matrix<T>& other) noexcept
+        {
+            if (&other != this)
+            {
+                std::swap(data_, other.data_);
+                std::swap(rows_, other.rows_);
+                std::swap(cols_, other.cols_);
+            }
+        }
     private:
         size_t rows_;
         size_t cols_;
