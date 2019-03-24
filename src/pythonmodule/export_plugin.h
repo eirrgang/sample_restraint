@@ -9,8 +9,13 @@
 #include "gmxapi/md/mdmodule.h"
 #include "gmxapi/gmxapi.h"
 
+#include "restraint.h"
+#include "sessionresources.h"
+
 namespace py = pybind11;
 
+namespace plugin
+{
 ////////////////////////////////
 // Begin PyRestraint static code
 /*!
@@ -75,7 +80,7 @@ class PyRestraint : public T, public std::enable_shared_from_this<PyRestraint<T>
 template<class T>
 void PyRestraint<T>::bind(py::object object)
 {
-    PyObject * capsule = object.ptr();
+    PyObject* capsule = object.ptr();
     if (PyCapsule_IsValid(capsule,
                           gmxapi::MDHolder::api_name))
     {
@@ -122,7 +127,38 @@ template<class PotentialT>
 class RestraintBuilder
 {
     public:
-        explicit RestraintBuilder(py::object element);
+        explicit RestraintBuilder(py::object element)
+        {
+            name_ = py::cast<std::string>(element.attr("name"));
+            assert(!name_.empty());
+
+            // It looks like we need some boilerplate exceptions for plugins so we have something to
+            // raise if the element is invalid.
+            assert(py::hasattr(element,
+                               "params"));
+
+            // Params attribute should be a Python dict
+            parameter_dict_ = element.attr("params");
+            // \todo Check for the presence of these dictionary keys to avoid hard-to-diagnose error.
+
+            // Get positional parameters.
+            py::list sites = parameter_dict_["sites"];
+            for (auto&& site : sites)
+            {
+                siteIndices_.emplace_back(py::cast<int>(site));
+            }
+
+
+            // Note that if we want to grab a reference to the Context or its communicator, we can get it
+            // here through element.workspec._context. We need a more general API solution, but this code is
+            // in the Python bindings code, so we know we are in a Python Context.
+            assert(py::hasattr(element,
+                               "workspec"));
+            auto workspec = element.attr("workspec");
+            assert(py::hasattr(workspec,
+                               "_context"));
+            context_ = workspec.attr("_context");
+        }
 
         /*!
          * \brief Add node(s) to graph for the work element.
@@ -131,7 +167,50 @@ class RestraintBuilder
          *
          * \todo This may not follow the latest graph building protocol as described.
          */
-        void build(py::object graph);
+        void build(py::object graph)
+        {
+            // For each registered input, call the stored function object to set
+            // the C++ data from the provided Python data.
+            for(const auto& setter : setters_)
+            {
+                setter(&params_, parameter_dict_);
+            }
+
+
+            // Temporarily subvert things to get quick-and-dirty solution for testing.
+            // Need to capture Python communicator and pybind syntax in closure so Resources
+            // can just call with matrix arguments.
+
+            // This can be replaced with a subscription and delayed until launch, if necessary.
+            if (!py::hasattr(context_, "ensemble_update"))
+            {
+                throw gmxapi::ProtocolError("context does not have 'mdstring_update'.");
+            }
+            // make a local copy of the Python object so we can capture it in the lambda
+            auto update = context_.attr("ensemble_update");
+            // Make a callable with standardizeable signature.
+            const std::string name{name_};
+            auto functor = [update, name](const plugin::Matrix<double>& send,
+                                          plugin::Matrix<double>* receive) {
+                update(send,
+                       receive,
+                       py::str(name));
+            };
+
+            // To use a reduce function on the Python side, we need to provide it with a Python buffer-like object,
+            // so we will create one here. Note: it looks like the SharedData element will be useful after all.
+            auto resources = std::make_shared<plugin::Resources>(std::move(functor));
+
+            auto potential = PyRestraint<plugin::RestraintModule<plugin::Restraint<PotentialT>>>::create(name_,
+                                                                                                                        siteIndices_,
+                                                                                                                        params_,
+                                                                                                                        resources);
+
+            auto subscriber = subscriber_;
+            py::list potentialList = subscriber.attr("potential");
+            potentialList.append(potential);
+
+        };
 
         /*!
          * \brief Accept subscription of an MD task.
@@ -148,6 +227,27 @@ class RestraintBuilder
             subscriber_ = subscriber;
         };
 
+        /*!
+         * \brief Register an input name and storage location.
+         *
+         * Example:
+         *
+         *      builder.add_setter("nbins", &input_param_type::nBins);
+         */
+        template<typename T>
+        RestraintBuilder& add_input(const std::string& name,
+                                    T PotentialT::input_param_type::* data_ptr)
+        {
+            auto setter =
+                [=](typename PotentialT::input_param_type* p, const py::dict& d)->void
+            {
+                p->*data_ptr = py::cast<T>(d[name.c_str()]);
+            };
+            this->setters_.emplace_back(setter);
+            return *this;
+        };
+
+        py::dict parameter_dict_;
         py::object subscriber_;
         py::object context_;
         std::vector<int> siteIndices_;
@@ -155,6 +255,10 @@ class RestraintBuilder
         typename PotentialT::input_param_type params_;
 
         std::string name_;
+
+        std::vector<std::function<void(typename PotentialT::input_param_type*, const py::dict&)>> setters_;
 };
+
+} // end namespace plugin
 
 #endif //GMXAPI_SAMPLE_RESTRAINT_EXPORT_PLUGIN_H
