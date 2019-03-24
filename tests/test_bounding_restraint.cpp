@@ -50,7 +50,7 @@ TEST(EnsembleBoundingPotentialPlugin, ForceCalc)
         experimental{{0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1}};
 
 
-    plugin::EnsembleHarmonic restraint{10, // nbins
+    plugin::EnsemblePotential restraint{10, // nbins
                                        1.0, // binWidth
                                        5.0, // minDist
                                        5.0, // maxDist

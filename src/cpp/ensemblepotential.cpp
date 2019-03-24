@@ -110,7 +110,7 @@ class BlurToGrid
         const double sigma_;
 };
 
-EnsembleHarmonic::EnsembleHarmonic(size_t nbins,
+EnsemblePotential::EnsemblePotential(size_t nbins,
                                    double binWidth,
                                    double minDist,
                                    double maxDist,
@@ -142,8 +142,8 @@ EnsembleHarmonic::EnsembleHarmonic(size_t nbins,
     sigma_{sigma}
 {}
 
-EnsembleHarmonic::EnsembleHarmonic(const input_param_type& params) :
-    EnsembleHarmonic(params.nBins,
+EnsemblePotential::EnsemblePotential(const input_param_type& params) :
+    EnsemblePotential(params.nBins,
                      params.binWidth,
                      params.minDist,
                      params.maxDist,
@@ -163,7 +163,7 @@ EnsembleHarmonic::EnsembleHarmonic(const input_param_type& params) :
 // a parallelized simulation).
 //
 //
-void EnsembleHarmonic::callback(gmx::Vector v,
+void EnsemblePotential::callback(gmx::Vector v,
                                 gmx::Vector v0,
                                 double t,
                                 const EnsembleResources& resources)
@@ -269,7 +269,7 @@ void EnsembleHarmonic::callback(gmx::Vector v,
 // HERE is the function that does the calculation of the restraint force.
 //
 //
-gmx::PotentialPointData EnsembleHarmonic::calculate(gmx::Vector v,
+gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
                                                     gmx::Vector v0,
                                                     double t)
 {

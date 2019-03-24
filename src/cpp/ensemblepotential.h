@@ -96,13 +96,13 @@ makeEnsembleParams(size_t nbins,
  * the difference between the sampled and experimental histograms. At the beginning of the window, this
  * difference is found and a Gaussian blur is applied.
  */
-class EnsembleHarmonic
+class EnsemblePotential
 {
     public:
         using input_param_type = ensemble_input_param_type;
 
         /* No default constructor. Parameters must be provided. */
-//        EnsembleHarmonic();
+//        EnsemblePotential();
 
         /*!
          * \brief Constructor called by the wrapper code to produce a new instance.
@@ -112,7 +112,7 @@ class EnsembleHarmonic
          *
          * \param params
          */
-        explicit EnsembleHarmonic(const input_param_type& params);
+        explicit EnsemblePotential(const input_param_type& params);
 
         /*!
          * \brief Deprecated constructor taking a parameter list.
@@ -128,7 +128,7 @@ class EnsembleHarmonic
          * \param k
          * \param sigma
          */
-        EnsembleHarmonic(size_t nbins,
+        EnsemblePotential(size_t nbins,
                          double binWidth,
                          double minDist,
                          double maxDist,
@@ -215,16 +215,16 @@ class EnsembleHarmonic
  *
  * This is boiler plate that will be templated and moved.
  */
-class EnsembleRestraint : public ::gmx::IRestraintPotential, private EnsembleHarmonic
+class EnsembleRestraint : public ::gmx::IRestraintPotential, private EnsemblePotential
 {
     public:
-        using EnsembleHarmonic::input_param_type;
+        using EnsemblePotential::input_param_type;
 
         EnsembleRestraint(std::vector<int> sites,
                           const input_param_type& params,
                           std::shared_ptr<EnsembleResources> resources
         ) :
-            EnsembleHarmonic(params),
+            EnsemblePotential(params),
             sites_{std::move(sites)},
             resources_{std::move(resources)}
         {}
