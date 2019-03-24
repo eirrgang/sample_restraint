@@ -118,5 +118,43 @@ std::shared_ptr<gmxapi::MDModule> PyRestraint<T>::getModule()
     return module;
 }
 
+template<class PotentialT>
+class RestraintBuilder
+{
+    public:
+        explicit RestraintBuilder(py::object element);
+
+        /*!
+         * \brief Add node(s) to graph for the work element.
+         *
+         * \param graph networkx.DiGraph object still evolving in gmx.context.
+         *
+         * \todo This may not follow the latest graph building protocol as described.
+         */
+        void build(py::object graph);
+
+        /*!
+         * \brief Accept subscription of an MD task.
+         *
+         * \param subscriber Python object with a 'potential' attribute that is a Python list.
+         *
+         * During build, an object is added to the subscriber's self.potential, which is then bound with
+         * system.add_potential(potential) during the subscriber's launch()
+         */
+        void addSubscriber(py::object subscriber)
+        {
+            assert(py::hasattr(subscriber,
+                               "potential"));
+            subscriber_ = subscriber;
+        };
+
+        py::object subscriber_;
+        py::object context_;
+        std::vector<int> siteIndices_;
+
+        typename PotentialT::input_param_type params_;
+
+        std::string name_;
+};
 
 #endif //GMXAPI_SAMPLE_RESTRAINT_EXPORT_PLUGIN_H

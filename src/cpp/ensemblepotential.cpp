@@ -1,7 +1,3 @@
-//
-// Created by Eric Irrgang on 2/26/18.
-//
-
 /*! \file
  * \brief Code to implement the potential declared in ensemblepotential.h
  *
@@ -10,6 +6,8 @@
  *
  * A simpler restraint potential would only update the calculate() function. If a callback function is
  * not needed or desired, remove the callback() code from this file and from ensemblepotential.h
+ *
+ * \author M. Eric Irrgang <ericirrgang@gmail.com>
  */
 
 #include "ensemblepotential.h"
@@ -30,8 +28,9 @@ namespace plugin
 {
 
 /*!
- * \brief Apply a Gaussian blur when building a density grid for a list of values.
+ * \brief Discretize a density field on a grid.
  *
+ * Apply a Gaussian blur when building a density grid for a list of values.
  * Normalize such that the area under each sample is 1.0/num_samples.
  */
 class BlurToGrid
@@ -111,36 +110,35 @@ class BlurToGrid
 };
 
 EnsemblePotential::EnsemblePotential(size_t nbins,
-                                   double binWidth,
-                                   double minDist,
-                                   double maxDist,
-                                   PairHist experimental,
-                                   unsigned int nSamples,
-                                   double samplePeriod,
-                                   unsigned int nWindows,
-                                   double k,
-                                   double sigma) :
-    nBins_{nbins},
-    binWidth_{binWidth},
-    minDist_{minDist},
-    maxDist_{maxDist},
-    histogram_(nbins,
-               0),
-    experimental_{std::move(experimental)},
-    nSamples_{nSamples},
+                                     double binWidth,
+                                     double minDist,
+                                     double maxDist,
+                                     const std::vector<double>& experimental,
+                                     unsigned int nSamples,
+                                     double samplePeriod,
+                                     unsigned int nWindows,
+                                     double k,
+                                     double sigma) :
+    histogram_(nbins, 0),
     currentSample_{0},
-    samplePeriod_{samplePeriod},
     // In actuality, we have nsamples at (samplePeriod - dt), but we don't have access to dt.
     nextSampleTime_{samplePeriod},
-    distanceSamples_(nSamples),
-    nWindows_{nWindows},
     currentWindow_{0},
     windowStartTime_{0},
     nextWindowUpdateTime_{nSamples * samplePeriod},
-    windows_{},
-    k_{k},
-    sigma_{sigma}
-{}
+    windows_{}
+{
+    state_.nBins = nbins;
+    state_.binWidth = binWidth;
+    state_.minDist = minDist;
+    state_.maxDist = maxDist;
+    state_.experimental = experimental;
+    state_.nSamples = nSamples;
+    state_.samplePeriod = samplePeriod;
+    state_.nWindows = nWindows;
+    state_.k = k;
+    state_.sigma = sigma;
+}
 
 EnsemblePotential::EnsemblePotential(const input_param_type& params) :
     EnsemblePotential(params.nBins,
@@ -164,9 +162,9 @@ EnsemblePotential::EnsemblePotential(const input_param_type& params) :
 //
 //
 void EnsemblePotential::callback(gmx::Vector v,
-                                gmx::Vector v0,
-                                double t,
-                                const EnsembleResources& resources)
+                                 gmx::Vector v0,
+                                 double t,
+                                 const Resources& resources)
 {
     const auto rdiff = v - v0;
     const auto Rsquared = dot(rdiff,
@@ -177,7 +175,7 @@ void EnsemblePotential::callback(gmx::Vector v,
     if (t >= nextSampleTime_)
     {
         distanceSamples_[currentSample_++] = R;
-        nextSampleTime_ = (currentSample_ + 1) * samplePeriod_ + windowStartTime_;
+        nextSampleTime_ = (currentSample_ + 1) * state_.samplePeriod + windowStartTime_;
     };
 
     // Every nsteps:
@@ -191,9 +189,9 @@ void EnsemblePotential::callback(gmx::Vector v,
     {
         // Get next histogram array, recycling old one if available.
         std::unique_ptr<Matrix<double>> new_window = std::make_unique<Matrix<double>>(1,
-                                                                                              nBins_);
+                                                                                      state_.nBins);
         std::unique_ptr<Matrix<double>> temp_window;
-        if (windows_.size() == nWindows_)
+        if (windows_.size() == state_.nWindows)
         {
             // Recycle the oldest window.
             // \todo wrap this in a helper class that manages a buffer we can shuffle through.
@@ -210,11 +208,11 @@ void EnsemblePotential::callback(gmx::Vector v,
 
         // Reduce sampled data for this restraint in this simulation, applying a Gaussian blur to fill a grid.
         auto blur = BlurToGrid(0.0,
-                               binWidth_,
-                               sigma_);
+                               state_.binWidth,
+                               state_.sigma);
         assert(new_window != nullptr);
-        assert(distanceSamples_.size() == nSamples_);
-        assert(currentSample_ == nSamples_);
+        assert(distanceSamples_.size() == state_.nSamples);
+        assert(currentSample_ == state_.nSamples);
         blur(distanceSamples_,
              new_window->vector());
         // We can just do the blur locally since there aren't many bins. Bundling these operations for
@@ -242,7 +240,7 @@ void EnsemblePotential::callback(gmx::Vector v,
         {
             for (size_t i = 0;i < window->cols();++i)
             {
-                histogram_.at(i) += (window->vector()->at(i) - experimental_.at(i)) / windows_.size();
+                histogram_.at(i) += (window->vector()->at(i) - state_.experimental.at(i)) / windows_.size();
             }
         }
 
@@ -252,13 +250,13 @@ void EnsemblePotential::callback(gmx::Vector v,
         // simulation progresses, so _update_period should be cleanly representable in binary. When we extract this
         // to a facility, we can look for a part of the code with access to the current timestep.
         windowStartTime_ = t;
-        nextWindowUpdateTime_ = nSamples_ * samplePeriod_ + windowStartTime_;
+        nextWindowUpdateTime_ = state_.nSamples * state_.samplePeriod + windowStartTime_;
         ++currentWindow_; // This is currently never used. I'm not sure it will be, either...
 
         // Reset sample bufering.
         currentSample_ = 0;
         // Reset sample times.
-        nextSampleTime_ = t + samplePeriod_;
+        nextSampleTime_ = t + state_.samplePeriod;
     };
 
 }
@@ -291,30 +289,30 @@ gmx::PotentialPointData EnsemblePotential::calculate(gmx::Vector v,
 
         double f{0};
 
-        if (R > maxDist_)
+        if (R > state_.maxDist)
         {
             // apply a force to reduce R
-            f = k_ * (maxDist_ - R);
+            f = state_.k * (state_.maxDist - R);
         }
-        else if (R < minDist_)
+        else if (R < state_.minDist)
         {
             // apply a force to increase R
-            f = k_ * (minDist_ - R);
+            f = state_.k * (state_.minDist - R);
         }
         else
         {
             double f_scal{0};
 
             const size_t numBins = histogram_.size();
-            double normConst = sqrt(2 * M_PI) * sigma_ * sigma_ * sigma_;
+            double normConst = sqrt(2 * M_PI) * state_.sigma * state_.sigma * state_.sigma;
 
             for (size_t n = 0;n < numBins;n++)
             {
-                const double x{n * binWidth_ - R};
-                const double argExp{-0.5 * x * x / (sigma_ * sigma_)};
+                const double x{n * state_.binWidth - R};
+                const double argExp{-0.5 * x * x / (state_.sigma * state_.sigma)};
                 f_scal += histogram_.at(n) * exp(argExp) * x / normConst;
             }
-            f = -k_ * f_scal;
+            f = -state_.k * f_scal;
         }
 
         const auto magnitude = f / norm(rdiff);
@@ -354,6 +352,6 @@ makeEnsembleParams(size_t nbins,
 // Important: Explicitly instantiate a definition for the templated class declared in ensemblepotential.h.
 // Failing to do this will cause a linker error.
 template
-class ::plugin::RestraintModule<EnsembleRestraint>;
+class ::plugin::RestraintModule<Restraint<EnsemblePotential>>;
 
 } // end namespace plugin
