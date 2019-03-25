@@ -24,8 +24,7 @@
 // Make a convenient alias to save some typing...
 namespace py = pybind11;
 
-namespace plugin
-{
+using namespace plugin;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // New restraints mimicking MDStringRestraint should specialize getModule() here.
@@ -147,5 +146,3 @@ PYBIND11_MODULE(mdstring, m) {
     // End EnsembleRestraint
     ///////////////////////////////////////////////////////////////////////////
 }
-
-} // end namespace plugin
