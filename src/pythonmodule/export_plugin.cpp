@@ -30,8 +30,7 @@ using namespace plugin;
 // New restraints mimicking MDStringRestraint should specialize getModule() here.
 //////////////////////////////////////////////////////////////////////////////////////////
 template<>
-std::shared_ptr<gmxapi::MDModule> PyRestraint<RestraintModule<Restraint<EnsemblePotential
->>>::getModule()
+std::shared_ptr<gmxapi::MDModule> plugin::PyRestraint<RestraintModule<Restraint<EnsemblePotential>>>::getModule()
 {
     return shared_from_this();
 }
