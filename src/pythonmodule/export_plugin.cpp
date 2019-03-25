@@ -24,7 +24,14 @@
 // Make a convenient alias to save some typing...
 namespace py = pybind11;
 
-using namespace plugin;
+// TODO: Improve readability by instantiating some template specializations as type aliases.
+using plugin::EnsemblePotential;
+using plugin::Matrix;
+using plugin::Restraint;
+using plugin::RestraintModule;
+using plugin::RestraintBuilder;
+using plugin::PyRestraint;
+using plugin::makeEnsembleParams;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // New restraints mimicking MDStringRestraint should specialize getModule() here.
