@@ -23,6 +23,8 @@ namespace plugin
 
 // Stop-gap for cross-language data exchange pending GROMACS updates.
 // Adapted from pybind docs.
+// TODO: Access: need matrix View.
+// TODO: See if we can replace with or converge with newer GROMACS Matrix class.
 template<class T>
 class Matrix
 {
@@ -44,6 +46,9 @@ class Matrix
         }
 
         std::vector<T>* vector()
+        { return &data_; }
+
+        const std::vector<T>* vector() const
         { return &data_; }
 
         T* data()

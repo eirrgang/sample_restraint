@@ -232,7 +232,7 @@ void EnsemblePotential::callback(gmx::Vector v,
         {
             for (size_t i = 0;i < window.cols();++i)
             {
-                state_.histogram.at(i) += (window.data()[i] - state_.experimental.at(i)) / state_.windows.size();
+                state_.histogram.at(i) += (window.vector()->at(i) - state_.experimental.at(i)) / state_.windows.size();
             }
         }
 
